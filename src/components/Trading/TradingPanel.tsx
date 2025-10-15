@@ -1,21 +1,102 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BinanceFuturesAPI } from '../../services/binanceFuturesAPI';
 import { useChartStore } from '../../store/chartStore';
 import { useAutoTrading } from '../../hooks/useAutoTrading';
 
+// localStorage 키
+const STORAGE_KEYS = {
+  API_KEY: 'trading_api_key',
+  API_SECRET: 'trading_api_secret',
+  IS_API_CONFIGURED: 'trading_is_api_configured',
+  QUANTITY: 'trading_quantity',
+  LEVERAGE: 'trading_leverage',
+  STOP_LOSS_PERCENT: 'trading_stop_loss_percent',
+  USE_STOP_LOSS: 'trading_use_stop_loss',
+  STOP_LOSS_OFFSET: 'trading_stop_loss_offset',
+  IS_AUTO_TRADING: 'trading_is_auto_trading',
+  USE_PERCENTAGE: 'trading_use_percentage',
+  ACCOUNT_PERCENTAGE: 'trading_account_percentage',
+};
+
 export const TradingPanel = () => {
   const { symbol, highChannelEntryPoints } = useChartStore();
 
-  const [apiKey, setApiKey] = useState('');
-  const [apiSecret, setApiSecret] = useState('');
-  const [isApiConfigured, setIsApiConfigured] = useState(false);
-  const [quantity, setQuantity] = useState('0.01');
-  const [leverage, setLeverage] = useState('10');
-  const [stopLossPercent, setStopLossPercent] = useState('5'); // 스탑로스 %
-  const [useStopLoss, setUseStopLoss] = useState(true);
-  const [stopLossOffset, setStopLossOffset] = useState('5'); // 스탑로스 오프셋 %
-  const [isAutoTradingEnabled, setIsAutoTradingEnabled] = useState(false);
+  // localStorage에서 값 불러오기
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
+  const [apiSecret, setApiSecret] = useState(() => localStorage.getItem(STORAGE_KEYS.API_SECRET) || '');
+  const [isApiConfigured, setIsApiConfigured] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.IS_API_CONFIGURED) === 'true'
+  );
+  const [quantity, setQuantity] = useState(() => localStorage.getItem(STORAGE_KEYS.QUANTITY) || '0.01');
+  const [leverage, setLeverage] = useState(() => localStorage.getItem(STORAGE_KEYS.LEVERAGE) || '10');
+  const [stopLossPercent, setStopLossPercent] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.STOP_LOSS_PERCENT) || '5'
+  );
+  const [useStopLoss, setUseStopLoss] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.USE_STOP_LOSS) !== 'false'
+  );
+  const [stopLossOffset, setStopLossOffset] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.STOP_LOSS_OFFSET) || '5'
+  );
+  const [isAutoTradingEnabled, setIsAutoTradingEnabled] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.IS_AUTO_TRADING) === 'true'
+  );
   const [isTrading, setIsTrading] = useState(false);
+
+  // 잔고 관련
+  const [balance, setBalance] = useState<number | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [usePercentage, setUsePercentage] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.USE_PERCENTAGE) === 'true'
+  );
+  const [accountPercentage, setAccountPercentage] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.ACCOUNT_PERCENTAGE) || '10'
+  );
+
+  // localStorage에 값 저장
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+  }, [apiKey]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.API_SECRET, apiSecret);
+  }, [apiSecret]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.IS_API_CONFIGURED, String(isApiConfigured));
+  }, [isApiConfigured]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.QUANTITY, quantity);
+  }, [quantity]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.LEVERAGE, leverage);
+  }, [leverage]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STOP_LOSS_PERCENT, stopLossPercent);
+  }, [stopLossPercent]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USE_STOP_LOSS, String(useStopLoss));
+  }, [useStopLoss]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STOP_LOSS_OFFSET, stopLossOffset);
+  }, [stopLossOffset]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.IS_AUTO_TRADING, String(isAutoTradingEnabled));
+  }, [isAutoTradingEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USE_PERCENTAGE, String(usePercentage));
+  }, [usePercentage]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ACCOUNT_PERCENTAGE, accountPercentage);
+  }, [accountPercentage]);
 
   // 자동 거래 Hook
   const { executeManually, calculateTradingMetrics } = useAutoTrading({
@@ -25,8 +106,51 @@ export const TradingPanel = () => {
     stopLossPercent: parseFloat(stopLossPercent),
   });
 
+  // 잔고 조회
+  const fetchBalance = async () => {
+    setIsLoadingBalance(true);
+    try {
+      const balances = await BinanceFuturesAPI.getAccountBalance();
+      // USDT 잔고 찾기
+      const usdtBalance = balances.find((b: any) => b.asset === 'USDT');
+      if (usdtBalance) {
+        setBalance(parseFloat(usdtBalance.availableBalance));
+      }
+    } catch (error: any) {
+      console.error('잔고 조회 에러:', error);
+      alert(`잔고 조회 실패: ${error.message}`);
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  // 비율로 수량 계산
+  const calculateQuantityFromPercentage = (currentPrice: number) => {
+    if (!balance || !usePercentage) return parseFloat(quantity);
+
+    const percentage = parseFloat(accountPercentage) / 100;
+    const lev = parseInt(leverage);
+
+    // 사용 가능한 증거금 = 잔고 × 비율
+    const availableMargin = balance * percentage;
+
+    // 주문 수량 = (증거금 × 레버리지) / 현재가
+    const calculatedQty = (availableMargin * lev) / currentPrice;
+
+    return calculatedQty;
+  };
+
+  // API 설정이 저장되어 있으면 자동으로 설정
+  useEffect(() => {
+    if (isApiConfigured && apiKey && apiSecret) {
+      BinanceFuturesAPI.setApiCredentials(apiKey, apiSecret);
+      fetchBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 초기 마운트 시에만 실행
+
   // API 자격 증명 설정
-  const handleConfigureApi = () => {
+  const handleConfigureApi = async () => {
     if (!apiKey || !apiSecret) {
       alert('API Key와 Secret을 입력해주세요.');
       return;
@@ -34,6 +158,10 @@ export const TradingPanel = () => {
 
     BinanceFuturesAPI.setApiCredentials(apiKey, apiSecret);
     setIsApiConfigured(true);
+
+    // 잔고 조회
+    await fetchBalance();
+
     alert('API 설정이 완료되었습니다.');
   };
 
@@ -51,8 +179,8 @@ export const TradingPanel = () => {
 
     setIsTrading(true);
     try {
-      const qty = parseFloat(quantity);
       const entryPrice = highChannelEntryPoints.longEntry;
+      const qty = calculateQuantityFromPercentage(entryPrice);
       const stopLoss = useStopLoss
         ? entryPrice * (1 - parseFloat(stopLossOffset) / 100)
         : undefined;
@@ -61,7 +189,10 @@ export const TradingPanel = () => {
 
       const result = await BinanceFuturesAPI.enterLongPosition(symbol, qty, stopLoss);
 
-      alert(`롱 포지션 진입 성공!\n진입가: $${entryPrice.toFixed(2)}`);
+      // 진입 후 잔고 갱신
+      await fetchBalance();
+
+      alert(`롱 포지션 진입 성공!\n진입가: $${entryPrice.toFixed(2)}\n수량: ${qty.toFixed(4)} ETH`);
       console.log('롱 진입 결과:', result);
     } catch (error: any) {
       alert(`롱 진입 실패: ${error.message}`);
@@ -85,8 +216,8 @@ export const TradingPanel = () => {
 
     setIsTrading(true);
     try {
-      const qty = parseFloat(quantity);
       const entryPrice = highChannelEntryPoints.shortEntry;
+      const qty = calculateQuantityFromPercentage(entryPrice);
       const stopLoss = useStopLoss
         ? entryPrice * (1 + parseFloat(stopLossOffset) / 100)
         : undefined;
@@ -95,7 +226,10 @@ export const TradingPanel = () => {
 
       const result = await BinanceFuturesAPI.enterShortPosition(symbol, qty, stopLoss);
 
-      alert(`숏 포지션 진입 성공!\n진입가: $${entryPrice.toFixed(2)}`);
+      // 진입 후 잔고 갱신
+      await fetchBalance();
+
+      alert(`숏 포지션 진입 성공!\n진입가: $${entryPrice.toFixed(2)}\n수량: ${qty.toFixed(4)} ETH`);
       console.log('숏 진입 결과:', result);
     } catch (error: any) {
       alert(`숏 진입 실패: ${error.message}`);
@@ -144,19 +278,86 @@ export const TradingPanel = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="text-sm text-green-400">✓ API 설정 완료</div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-green-400">✓ API 설정 완료</div>
+            <button
+              onClick={fetchBalance}
+              disabled={isLoadingBalance}
+              className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              {isLoadingBalance ? '조회 중...' : '잔고 갱신'}
+            </button>
+          </div>
 
-          {/* 거래 설정 */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">수량 (ETH)</label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              step="0.001"
-              min="0.001"
-              className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-            />
+          {/* 잔고 표시 */}
+          {balance !== null && (
+            <div className="border border-gray-600 rounded p-3 bg-gray-750">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">사용 가능 잔고</span>
+                <span className="text-lg font-semibold text-yellow-400">
+                  ${balance.toFixed(2)} USDT
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 수량 입력 방식 선택 */}
+          <div className="border border-gray-600 rounded p-3">
+            <div className="flex items-center gap-4 mb-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={!usePercentage}
+                  onChange={() => setUsePercentage(false)}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-300">직접 입력</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={usePercentage}
+                  onChange={() => setUsePercentage(true)}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-300">자산 비율</span>
+              </label>
+            </div>
+
+            {!usePercentage ? (
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">수량 (ETH)</label>
+                <input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  step="0.001"
+                  min="0.001"
+                  className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">자산 비율 (%)</label>
+                <input
+                  type="number"
+                  value={accountPercentage}
+                  onChange={(e) => setAccountPercentage(e.target.value)}
+                  step="1"
+                  min="1"
+                  max="100"
+                  className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  총 자산의 {accountPercentage}%를 사용하여 {leverage}배 레버리지로 거래
+                </p>
+                {balance && highChannelEntryPoints.longEntry && (
+                  <p className="text-xs text-blue-400 mt-1">
+                    예상 수량: ~{calculateQuantityFromPercentage(highChannelEntryPoints.longEntry).toFixed(4)} ETH
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -275,7 +476,14 @@ export const TradingPanel = () => {
           </div>
 
           <button
-            onClick={() => setIsApiConfigured(false)}
+            onClick={() => {
+              setIsApiConfigured(false);
+              setBalance(null);
+              // localStorage의 API 키만 초기화 (다른 설정은 유지)
+              localStorage.removeItem(STORAGE_KEYS.API_KEY);
+              localStorage.removeItem(STORAGE_KEYS.API_SECRET);
+              localStorage.removeItem(STORAGE_KEYS.IS_API_CONFIGURED);
+            }}
             className="w-full px-4 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors text-sm"
           >
             API 재설정
