@@ -114,6 +114,15 @@ export const TradingPanel = () => {
     stopLossPercent: parseFloat(stopLossPercent),
   });
 
+  // 자동 거래 토글 ON 시 즉시 실행
+  useEffect(() => {
+    if (isAutoTradingEnabled && isApiConfigured && highChannelEntryPoints.longEntry && highChannelEntryPoints.shortEntry) {
+      console.log('자동 거래 토글 ON - 즉시 주문 실행');
+      executeManually();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAutoTradingEnabled]); // isAutoTradingEnabled가 변경될 때만 실행
+
   // 잔고 조회
   const fetchBalance = async () => {
     setIsLoadingBalance(true);
@@ -642,17 +651,19 @@ export const TradingPanel = () => {
           </button>
 
           {/* 주문 내역 */}
-          {orders.length > 0 && (
-            <div className="mt-4 border-t border-gray-600 pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">주문 내역</h3>
+          <div className="mt-4 border-t border-gray-600 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">주문 내역</h3>
+              {orders.length > 0 && (
                 <button
                   onClick={clearHistory}
                   className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
                 >
                   전체 삭제
                 </button>
-              </div>
+              )}
+            </div>
+            {orders.length > 0 ? (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {orders.slice(0, 10).map((order) => (
                   <div key={order.id} className="bg-gray-700 rounded p-2 text-xs">
@@ -686,8 +697,12 @@ export const TradingPanel = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="text-center text-gray-500 text-sm py-4">
+                주문 내역이 없습니다
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
