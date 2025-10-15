@@ -229,18 +229,36 @@ export const TradingPanel = () => {
         ? entryPrice * (1 - parseFloat(stopLossOffset) / 100)
         : undefined;
 
-      console.log(`롱 진입 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
+      console.log(`롱 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
 
-      const result = await BinanceFuturesAPI.enterLongPosition(symbol, qty, stopLoss);
+      // 롱 진입 리밋 주문 생성
+      const limitOrder = await BinanceFuturesAPI.createLimitOrder(
+        symbol,
+        'BUY',
+        qty,
+        entryPrice
+      );
+      console.log('롱 리밋 주문 생성 완료:', limitOrder);
+
+      // 스탑로스 주문 생성
+      if (stopLoss) {
+        const stopLossOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'SELL',
+          type: 'STOP_MARKET',
+          quantity: qty,
+          stopPrice: stopLoss,
+        });
+        console.log('롱 스탑로스 설정 완료:', stopLossOrder);
+      }
 
       // 진입 후 잔고 갱신
       await fetchBalance();
 
-      showSuccess(`롱 포지션 진입 성공! 진입가: $${entryPrice.toFixed(2)}, 수량: ${qty.toFixed(4)} ETH`, '롱 진입 완료');
-      console.log('롱 진입 결과:', result);
+      showSuccess(`롱 리밋 주문 생성 완료! 진입가: $${entryPrice.toFixed(2)}, 수량: ${qty.toFixed(4)} ETH`, '롱 주문 생성');
     } catch (error: any) {
-      showError(`롱 진입 실패: ${error.message}`);
-      console.error('롱 진입 에러:', error);
+      showError(`롱 주문 생성 실패: ${error.message}`);
+      console.error('롱 주문 에러:', error);
     } finally {
       setIsTrading(false);
     }
@@ -266,18 +284,36 @@ export const TradingPanel = () => {
         ? entryPrice * (1 + parseFloat(stopLossOffset) / 100)
         : undefined;
 
-      console.log(`숏 진입 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
+      console.log(`숏 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
 
-      const result = await BinanceFuturesAPI.enterShortPosition(symbol, qty, stopLoss);
+      // 숏 진입 리밋 주문 생성
+      const limitOrder = await BinanceFuturesAPI.createLimitOrder(
+        symbol,
+        'SELL',
+        qty,
+        entryPrice
+      );
+      console.log('숏 리밋 주문 생성 완료:', limitOrder);
+
+      // 스탑로스 주문 생성
+      if (stopLoss) {
+        const stopLossOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'BUY',
+          type: 'STOP_MARKET',
+          quantity: qty,
+          stopPrice: stopLoss,
+        });
+        console.log('숏 스탑로스 설정 완료:', stopLossOrder);
+      }
 
       // 진입 후 잔고 갱신
       await fetchBalance();
 
-      showSuccess(`숏 포지션 진입 성공! 진입가: $${entryPrice.toFixed(2)}, 수량: ${qty.toFixed(4)} ETH`, '숏 진입 완료');
-      console.log('숏 진입 결과:', result);
+      showSuccess(`숏 리밋 주문 생성 완료! 진입가: $${entryPrice.toFixed(2)}, 수량: ${qty.toFixed(4)} ETH`, '숏 주문 생성');
     } catch (error: any) {
-      showError(`숏 진입 실패: ${error.message}`);
-      console.error('숏 진입 에러:', error);
+      showError(`숏 주문 생성 실패: ${error.message}`);
+      console.error('숏 주문 에러:', error);
     } finally {
       setIsTrading(false);
     }
@@ -527,14 +563,14 @@ export const TradingPanel = () => {
               disabled={isTrading || !highChannelEntryPoints.longEntry}
               className="px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              {isTrading ? '진행중...' : '롱 진입 ▲'}
+              {isTrading ? '주문중...' : '롱 주문 ▲'}
             </button>
             <button
               onClick={handleShortEntry}
               disabled={isTrading || !highChannelEntryPoints.shortEntry}
               className="px-4 py-3 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              {isTrading ? '진행중...' : '숏 진입 ▼'}
+              {isTrading ? '주문중...' : '숏 주문 ▼'}
             </button>
           </div>
 
