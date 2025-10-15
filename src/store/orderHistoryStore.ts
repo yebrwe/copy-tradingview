@@ -13,6 +13,7 @@ export interface OrderHistory {
   orderId?: number;
   error?: string;
   isAutoTrading: boolean;
+  pairId?: string; // 진입 주문과 스탑로스를 연결하기 위한 ID
 }
 
 interface OrderHistoryStore {

@@ -22,7 +22,7 @@ const STORAGE_KEYS = {
 export const TradingPanel = () => {
   const { symbol, highChannelEntryPoints } = useChartStore();
   const { showSuccess, showError, showWarning } = useToastStore();
-  const { orders, addOrder, loadFromStorage, clearHistory } = useOrderHistoryStore();
+  const { addOrder } = useOrderHistoryStore();
 
   // localStorage에서 값 불러오기
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
@@ -191,9 +191,6 @@ export const TradingPanel = () => {
 
   // API 설정이 저장되어 있으면 자동으로 설정
   useEffect(() => {
-    // 주문 내역 로드
-    loadFromStorage();
-
     if (isApiConfigured && apiKey && apiSecret) {
       BinanceFuturesAPI.setApiCredentials(apiKey, apiSecret);
       fetchBalance();
@@ -238,6 +235,9 @@ export const TradingPanel = () => {
         ? entryPrice * (1 - parseFloat(stopLossOffset) / 100)
         : undefined;
 
+      // 진입 주문과 스탑로스를 연결할 pairId 생성
+      const pairId = `long_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
       console.log(`롱 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
 
       // 롱 진입 리밋 주문 생성
@@ -259,6 +259,7 @@ export const TradingPanel = () => {
         status: 'pending',
         orderId: limitOrder.orderId,
         isAutoTrading: false,
+        pairId,
       });
 
       // 스탑로스 주문 생성
@@ -282,6 +283,7 @@ export const TradingPanel = () => {
           status: 'pending',
           orderId: stopLossOrder.orderId,
           isAutoTrading: false,
+          pairId,
         });
       }
 
@@ -317,6 +319,9 @@ export const TradingPanel = () => {
         ? entryPrice * (1 + parseFloat(stopLossOffset) / 100)
         : undefined;
 
+      // 진입 주문과 스탑로스를 연결할 pairId 생성
+      const pairId = `short_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
       console.log(`숏 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
 
       // 숏 진입 리밋 주문 생성
@@ -338,6 +343,7 @@ export const TradingPanel = () => {
         status: 'pending',
         orderId: limitOrder.orderId,
         isAutoTrading: false,
+        pairId,
       });
 
       // 스탑로스 주문 생성
@@ -361,6 +367,7 @@ export const TradingPanel = () => {
           status: 'pending',
           orderId: stopLossOrder.orderId,
           isAutoTrading: false,
+          pairId,
         });
       }
 
@@ -644,60 +651,6 @@ export const TradingPanel = () => {
           >
             API 재설정
           </button>
-
-          {/* 주문 내역 */}
-          <div className="mt-4 border-t border-gray-600 pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">주문 내역</h3>
-              {orders.length > 0 && (
-                <button
-                  onClick={clearHistory}
-                  className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
-                >
-                  전체 삭제
-                </button>
-              )}
-            </div>
-            {orders.length > 0 ? (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {orders.slice(0, 10).map((order) => (
-                  <div key={order.id} className="bg-gray-700 rounded p-2 text-xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-semibold ${order.side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
-                          {order.side}
-                        </span>
-                        <span className="text-gray-400">{order.type}</span>
-                        {order.isAutoTrading && (
-                          <span className="text-xs bg-blue-600 px-1 rounded">AUTO</span>
-                        )}
-                      </div>
-                      <span className="text-gray-500">
-                        {new Date(order.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <div className="text-gray-300">
-                      수량: {order.quantity.toFixed(4)} {order.symbol}
-                    </div>
-                    {order.price && (
-                      <div className="text-gray-300">
-                        가격: ${order.price.toFixed(2)}
-                      </div>
-                    )}
-                    {order.stopPrice && (
-                      <div className="text-gray-300">
-                        스탑: ${order.stopPrice.toFixed(2)}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 text-sm py-4">
-                주문 내역이 없습니다
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>

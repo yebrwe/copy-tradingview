@@ -121,6 +121,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       const longEntry = highChannelEntryPoints.longEntry;
       const longStopLoss = longEntry * (1 - config.stopLossPercent / 100);
       const longQuantity = calculateQuantityFromPercentage(longEntry);
+      const longPairId = `auto_long_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss.toFixed(2)}, 수량=${longQuantity.toFixed(4)}`);
 
@@ -145,6 +146,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         status: 'pending',
         orderId: longOrder.orderId,
         isAutoTrading: true,
+        pairId: longPairId,
       });
 
       // 롱 스탑로스 주문
@@ -167,12 +169,14 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         status: 'pending',
         orderId: longStopOrder.orderId,
         isAutoTrading: true,
+        pairId: longPairId,
       });
 
       // 4. 숏 진입 리밋 주문 생성
       const shortEntry = highChannelEntryPoints.shortEntry;
       const shortStopLoss = shortEntry * (1 + config.stopLossPercent / 100);
       const shortQuantity = calculateQuantityFromPercentage(shortEntry);
+      const shortPairId = `auto_short_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss.toFixed(2)}, 수량=${shortQuantity.toFixed(4)}`);
 
@@ -197,6 +201,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         status: 'pending',
         orderId: shortOrder.orderId,
         isAutoTrading: true,
+        pairId: shortPairId,
       });
 
       // 숏 스탑로스 주문
@@ -219,6 +224,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         status: 'pending',
         orderId: shortStopOrder.orderId,
         isAutoTrading: true,
+        pairId: shortPairId,
       });
 
       console.log('=== 자동 거래 완료 ===');

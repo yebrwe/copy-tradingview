@@ -2,6 +2,7 @@ import { TradingChart } from './components/Chart/TradingChart';
 import { TimeframeSelector } from './components/Chart/TimeframeSelector';
 import { Toolbar } from './components/Chart/Toolbar';
 import { TradingPanel } from './components/Trading/TradingPanel';
+import { OrderHistoryPanel } from './components/OrderHistory/OrderHistoryPanel';
 import { Toast } from './components/Toast/Toast';
 import { useBinanceWebSocket } from './hooks/useBinanceWebSocket';
 import { useChartStore } from './store/chartStore';
@@ -57,10 +58,12 @@ function App() {
         {/* 차트 및 거래 영역 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* 차트 영역 */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-4">
             <div className="relative bg-chart-bg rounded-lg overflow-hidden shadow-2xl">
               <TradingChart />
             </div>
+            {/* 주문 내역 */}
+            <OrderHistoryPanel />
           </div>
 
           {/* 거래 패널 */}
