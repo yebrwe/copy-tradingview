@@ -9,17 +9,59 @@ interface DrawingLayerProps {
 
 export const DrawingLayer = ({ chartWidth, chartHeight }: DrawingLayerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { selectedTool, drawings, addDrawing } = useChartStore();
+  const { selectedTool, drawings, addDrawing, candlestickData } = useChartStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentDrawing, setCurrentDrawing] = useState<Point[]>([]);
+
+  // Time/Price를 픽셀 좌표로 변환하는 헬퍼 함수
+  const convertToPixelCoordinates = (point: Point): { x: number; y: number } => {
+    // 이미 픽셀 좌표가 있으면 그대로 사용
+    if (point.x !== undefined && point.y !== undefined) {
+      return { x: point.x, y: point.y };
+    }
+
+    // Time/Price로부터 픽셀 좌표 계산
+    if (candlestickData.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    // 데이터 범위 계산
+    const times = candlestickData.map(c => c.time);
+    const prices = candlestickData.flatMap(c => [c.high, c.low]);
+
+    const minTime = Math.min(...times);
+    const maxTime = Math.max(...times);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+
+    // 여백 추가 (10%)
+    const padding = 0.1;
+    const priceRange = maxPrice - minPrice;
+    const paddedMinPrice = minPrice - priceRange * padding;
+    const paddedMaxPrice = maxPrice + priceRange * padding;
+
+    // 선형 변환
+    const x = ((point.time - minTime) / (maxTime - minTime)) * chartWidth;
+    const y = chartHeight - ((point.price - paddedMinPrice) / (paddedMaxPrice - paddedMinPrice)) * chartHeight;
+
+    return { x, y };
+  };
 
   // Canvas에 그림 그리기
   const draw = (ctx: CanvasRenderingContext2D) => {
     ctx.clearRect(0, 0, chartWidth, chartHeight);
 
+    // 디버깅: Canvas가 제대로 그려지는지 확인하기 위한 반투명 배경
+    // ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+    // ctx.fillRect(0, 0, chartWidth, chartHeight);
+
+    console.log('DrawingLayer: drawings count =', drawings.length);
+    console.log('DrawingLayer: candlestickData count =', candlestickData.length);
+
     // 기존 그림들 렌더링
     drawings.forEach((drawing) => {
+      console.log('Drawing:', drawing);
       drawShape(ctx, drawing);
     });
 
@@ -62,9 +104,14 @@ export const DrawingLayer = ({ chartWidth, chartHeight }: DrawingLayerProps) => 
   const drawTrendline = (ctx: CanvasRenderingContext2D, points: Point[]) => {
     if (points.length < 2) return;
 
+    console.log('drawTrendline: points =', points);
+    const p1 = convertToPixelCoordinates(points[0]);
+    const p2 = convertToPixelCoordinates(points[1]);
+    console.log('drawTrendline: pixel coordinates =', { p1, p2 });
+
     ctx.beginPath();
-    ctx.moveTo(points[0].x || 0, points[0].y || 0);
-    ctx.lineTo(points[1].x || 0, points[1].y || 0);
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
   };
 
@@ -156,7 +203,8 @@ export const DrawingLayer = ({ chartWidth, chartHeight }: DrawingLayerProps) => 
       ref={canvasRef}
       width={chartWidth}
       height={chartHeight}
-      className="absolute top-0 left-0 cursor-crosshair"
+      className="absolute top-0 left-0 cursor-crosshair pointer-events-auto"
+      style={{ zIndex: 10 }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

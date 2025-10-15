@@ -1,7 +1,6 @@
 import { TradingChart } from './components/Chart/TradingChart';
 import { TimeframeSelector } from './components/Chart/TimeframeSelector';
 import { Toolbar } from './components/Chart/Toolbar';
-import { DrawingLayer } from './components/Chart/DrawingLayer';
 import { useBinanceWebSocket } from './hooks/useBinanceWebSocket';
 import { useChartStore } from './store/chartStore';
 
@@ -38,7 +37,6 @@ function App() {
         {/* 차트 영역 */}
         <div className="relative bg-chart-bg rounded-lg overflow-hidden shadow-2xl">
           <TradingChart />
-          <DrawingLayer chartWidth={1568} chartHeight={600} />
         </div>
 
         {/* 사용법 안내 */}
