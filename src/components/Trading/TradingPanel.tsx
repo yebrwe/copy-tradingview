@@ -14,6 +14,8 @@ const STORAGE_KEYS = {
   LEVERAGE: 'trading_leverage',
   USE_STOP_LOSS: 'trading_use_stop_loss',
   STOP_LOSS_OFFSET: 'trading_stop_loss_offset',
+  USE_TAKE_PROFIT: 'trading_use_take_profit',
+  TAKE_PROFIT_OFFSET: 'trading_take_profit_offset',
   IS_AUTO_TRADING: 'trading_is_auto_trading',
   USE_PERCENTAGE: 'trading_use_percentage',
   ACCOUNT_PERCENTAGE: 'trading_account_percentage',
@@ -37,6 +39,12 @@ export const TradingPanel = () => {
   );
   const [stopLossOffset, setStopLossOffset] = useState(() =>
     localStorage.getItem(STORAGE_KEYS.STOP_LOSS_OFFSET) || '5'
+  );
+  const [useTakeProfit, setUseTakeProfit] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.USE_TAKE_PROFIT) === 'true'
+  );
+  const [takeProfitOffset, setTakeProfitOffset] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.TAKE_PROFIT_OFFSET) || '10'
   );
   const [isAutoTradingEnabled, setIsAutoTradingEnabled] = useState(() =>
     localStorage.getItem(STORAGE_KEYS.IS_AUTO_TRADING) === 'true'
@@ -87,6 +95,14 @@ export const TradingPanel = () => {
   }, [stopLossOffset]);
 
   useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USE_TAKE_PROFIT, String(useTakeProfit));
+  }, [useTakeProfit]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.TAKE_PROFIT_OFFSET, takeProfitOffset);
+  }, [takeProfitOffset]);
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.IS_AUTO_TRADING, String(isAutoTradingEnabled));
   }, [isAutoTradingEnabled]);
 
@@ -104,6 +120,9 @@ export const TradingPanel = () => {
     leverage: parseInt(leverage),
     quantity: parseFloat(quantity),
     stopLossPercent: parseFloat(stopLossOffset),
+    takeProfitPercent: parseFloat(takeProfitOffset),
+    useStopLoss: useStopLoss,
+    useTakeProfit: useTakeProfit,
     usePercentage: usePercentage,
     accountPercentage: parseFloat(accountPercentage),
     balance: balance || undefined,
@@ -234,11 +253,14 @@ export const TradingPanel = () => {
       const stopLoss = useStopLoss
         ? entryPrice * (1 - parseFloat(stopLossOffset) / 100)
         : undefined;
+      const takeProfit = useTakeProfit
+        ? entryPrice * (1 + parseFloat(takeProfitOffset) / 100)
+        : undefined;
 
-      // 진입 주문과 스탑로스를 연결할 pairId 생성
+      // 진입 주문과 스탑로스, 테이크프로핏을 연결할 pairId 생성
       const pairId = `long_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      console.log(`롱 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
+      console.log(`롱 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}, 테이크프로핏=${takeProfit}`);
 
       // 롱 진입 리밋 주문 생성
       const limitOrder = await BinanceFuturesAPI.createLimitOrder(
@@ -287,6 +309,31 @@ export const TradingPanel = () => {
         });
       }
 
+      // 테이크프로핏 주문 생성
+      if (takeProfit) {
+        const takeProfitOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'SELL',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: qty,
+          stopPrice: takeProfit,
+        });
+        console.log('롱 테이크프로핏 설정 완료:', takeProfitOrder);
+
+        // 테이크프로핏 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'SELL',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: qty,
+          takeProfitPrice: takeProfit,
+          status: 'pending',
+          orderId: takeProfitOrder.orderId,
+          isAutoTrading: false,
+          pairId,
+        });
+      }
+
       // 진입 후 잔고 갱신
       await fetchBalance();
 
@@ -318,11 +365,14 @@ export const TradingPanel = () => {
       const stopLoss = useStopLoss
         ? entryPrice * (1 + parseFloat(stopLossOffset) / 100)
         : undefined;
+      const takeProfit = useTakeProfit
+        ? entryPrice * (1 - parseFloat(takeProfitOffset) / 100)
+        : undefined;
 
-      // 진입 주문과 스탑로스를 연결할 pairId 생성
+      // 진입 주문과 스탑로스, 테이크프로핏을 연결할 pairId 생성
       const pairId = `short_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      console.log(`숏 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}`);
+      console.log(`숏 리밋 주문 생성 시도: 수량=${qty}, 진입가=${entryPrice}, 스탑로스=${stopLoss}, 테이크프로핏=${takeProfit}`);
 
       // 숏 진입 리밋 주문 생성
       const limitOrder = await BinanceFuturesAPI.createLimitOrder(
@@ -366,6 +416,31 @@ export const TradingPanel = () => {
           stopPrice: stopLoss,
           status: 'pending',
           orderId: stopLossOrder.orderId,
+          isAutoTrading: false,
+          pairId,
+        });
+      }
+
+      // 테이크프로핏 주문 생성
+      if (takeProfit) {
+        const takeProfitOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'BUY',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: qty,
+          stopPrice: takeProfit,
+        });
+        console.log('숏 테이크프로핏 설정 완료:', takeProfitOrder);
+
+        // 테이크프로핏 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'BUY',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: qty,
+          takeProfitPrice: takeProfit,
+          status: 'pending',
+          orderId: takeProfitOrder.orderId,
           isAutoTrading: false,
           pairId,
         });
@@ -568,6 +643,38 @@ export const TradingPanel = () => {
             </div>
           )}
 
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useTakeProfit"
+              checked={useTakeProfit}
+              onChange={(e) => setUseTakeProfit(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <label htmlFor="useTakeProfit" className="text-sm text-gray-300">
+              테이크프로핏 사용
+            </label>
+          </div>
+
+          {useTakeProfit && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                테이크프로핏 오프셋 (%)
+              </label>
+              <input
+                type="number"
+                value={takeProfitOffset}
+                onChange={(e) => setTakeProfitOffset(e.target.value)}
+                step="0.1"
+                min="0.1"
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                진입가 대비 {takeProfitOffset}% 상승한 지점에 테이크프로핏 설정
+              </p>
+            </div>
+          )}
+
           {/* 자동 거래 토글 */}
           <div className="border border-gray-600 rounded p-3 bg-gray-750">
             <div className="flex items-center justify-between mb-2">
@@ -605,6 +712,11 @@ export const TradingPanel = () => {
                     (SL: ${(highChannelEntryPoints.longEntry * (1 - parseFloat(stopLossOffset) / 100)).toFixed(2)})
                   </span>
                 )}
+                {useTakeProfit && (
+                  <span className="text-xs text-green-500 ml-2">
+                    (TP: ${(highChannelEntryPoints.longEntry * (1 + parseFloat(takeProfitOffset) / 100)).toFixed(2)})
+                  </span>
+                )}
               </div>
               <div className="text-sm">
                 <span className="text-gray-400">숏 진입가:</span>{' '}
@@ -614,6 +726,11 @@ export const TradingPanel = () => {
                 {useStopLoss && (
                   <span className="text-xs text-gray-500 ml-2">
                     (SL: ${(highChannelEntryPoints.shortEntry * (1 + parseFloat(stopLossOffset) / 100)).toFixed(2)})
+                  </span>
+                )}
+                {useTakeProfit && (
+                  <span className="text-xs text-green-500 ml-2">
+                    (TP: ${(highChannelEntryPoints.shortEntry * (1 - parseFloat(takeProfitOffset) / 100)).toFixed(2)})
                   </span>
                 )}
               </div>

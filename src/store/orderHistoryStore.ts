@@ -5,15 +5,16 @@ export interface OrderHistory {
   timestamp: number;
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: 'LIMIT' | 'MARKET' | 'STOP_MARKET';
+  type: 'LIMIT' | 'MARKET' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
   quantity: number;
   price?: number;
   stopPrice?: number;
+  takeProfitPrice?: number;
   status: 'pending' | 'filled' | 'failed';
   orderId?: number;
   error?: string;
   isAutoTrading: boolean;
-  pairId?: string; // 진입 주문과 스탑로스를 연결하기 위한 ID
+  pairId?: string; // 진입 주문과 스탑로스, 테이크프로핏을 연결하기 위한 ID
 }
 
 interface OrderHistoryStore {

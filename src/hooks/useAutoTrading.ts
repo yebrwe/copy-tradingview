@@ -9,6 +9,9 @@ interface AutoTradingConfig {
   leverage: number;
   quantity: number;
   stopLossPercent: number;
+  takeProfitPercent: number;
+  useStopLoss: boolean;
+  useTakeProfit: boolean;
   usePercentage?: boolean;
   accountPercentage?: number;
   balance?: number;
@@ -119,14 +122,21 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 3. 롱 진입 리밋 주문 생성
       const longEntry = highChannelEntryPoints.longEntry;
-      const longStopLoss = longEntry * (1 - config.stopLossPercent / 100);
+      const longStopLoss = config.useStopLoss
+        ? longEntry * (1 - config.stopLossPercent / 100)
+        : undefined;
+      const longTakeProfit = config.useTakeProfit
+        ? longEntry * (1 + config.takeProfitPercent / 100)
+        : undefined;
       const longQuantity = calculateQuantityFromPercentage(longEntry);
       const longPairId = `auto_long_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss.toFixed(2)}, 수량=${longQuantity.toFixed(4)}`);
+      console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss?.toFixed(2)}, 테이크프로핏=${longTakeProfit?.toFixed(2)}, 수량=${longQuantity.toFixed(4)}`);
 
-      const longMetrics = calculateTradingMetrics(longEntry, longStopLoss, longQuantity);
-      console.log('롱 포지션 지표:', longMetrics);
+      if (longStopLoss) {
+        const longMetrics = calculateTradingMetrics(longEntry, longStopLoss, longQuantity);
+        console.log('롱 포지션 지표:', longMetrics);
+      }
 
       const longOrder = await BinanceFuturesAPI.createLimitOrder(
         symbol,
@@ -150,38 +160,72 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       });
 
       // 롱 스탑로스 주문
-      const longStopOrder = await BinanceFuturesAPI.createOrder({
-        symbol,
-        side: 'SELL',
-        type: 'STOP_MARKET',
-        quantity: longQuantity,
-        stopPrice: longStopLoss,
-      });
-      console.log('롱 스탑로스 설정 완료:', longStopOrder);
+      if (longStopLoss) {
+        const longStopOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'SELL',
+          type: 'STOP_MARKET',
+          quantity: longQuantity,
+          stopPrice: longStopLoss,
+        });
+        console.log('롱 스탑로스 설정 완료:', longStopOrder);
 
-      // 스탑로스 주문 내역 저장
-      addOrder({
-        symbol,
-        side: 'SELL',
-        type: 'STOP_MARKET',
-        quantity: longQuantity,
-        stopPrice: longStopLoss,
-        status: 'pending',
-        orderId: longStopOrder.orderId,
-        isAutoTrading: true,
-        pairId: longPairId,
-      });
+        // 스탑로스 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'SELL',
+          type: 'STOP_MARKET',
+          quantity: longQuantity,
+          stopPrice: longStopLoss,
+          status: 'pending',
+          orderId: longStopOrder.orderId,
+          isAutoTrading: true,
+          pairId: longPairId,
+        });
+      }
+
+      // 롱 테이크프로핏 주문
+      if (longTakeProfit) {
+        const longTakeProfitOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'SELL',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: longQuantity,
+          stopPrice: longTakeProfit,
+        });
+        console.log('롱 테이크프로핏 설정 완료:', longTakeProfitOrder);
+
+        // 테이크프로핏 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'SELL',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: longQuantity,
+          takeProfitPrice: longTakeProfit,
+          status: 'pending',
+          orderId: longTakeProfitOrder.orderId,
+          isAutoTrading: true,
+          pairId: longPairId,
+        });
+      }
 
       // 4. 숏 진입 리밋 주문 생성
       const shortEntry = highChannelEntryPoints.shortEntry;
-      const shortStopLoss = shortEntry * (1 + config.stopLossPercent / 100);
+      const shortStopLoss = config.useStopLoss
+        ? shortEntry * (1 + config.stopLossPercent / 100)
+        : undefined;
+      const shortTakeProfit = config.useTakeProfit
+        ? shortEntry * (1 - config.takeProfitPercent / 100)
+        : undefined;
       const shortQuantity = calculateQuantityFromPercentage(shortEntry);
       const shortPairId = `auto_short_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss.toFixed(2)}, 수량=${shortQuantity.toFixed(4)}`);
+      console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss?.toFixed(2)}, 테이크프로핏=${shortTakeProfit?.toFixed(2)}, 수량=${shortQuantity.toFixed(4)}`);
 
-      const shortMetrics = calculateTradingMetrics(shortEntry, shortStopLoss, shortQuantity);
-      console.log('숏 포지션 지표:', shortMetrics);
+      if (shortStopLoss) {
+        const shortMetrics = calculateTradingMetrics(shortEntry, shortStopLoss, shortQuantity);
+        console.log('숏 포지션 지표:', shortMetrics);
+      }
 
       const shortOrder = await BinanceFuturesAPI.createLimitOrder(
         symbol,
@@ -205,27 +249,54 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       });
 
       // 숏 스탑로스 주문
-      const shortStopOrder = await BinanceFuturesAPI.createOrder({
-        symbol,
-        side: 'BUY',
-        type: 'STOP_MARKET',
-        quantity: shortQuantity,
-        stopPrice: shortStopLoss,
-      });
-      console.log('숏 스탑로스 설정 완료:', shortStopOrder);
+      if (shortStopLoss) {
+        const shortStopOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'BUY',
+          type: 'STOP_MARKET',
+          quantity: shortQuantity,
+          stopPrice: shortStopLoss,
+        });
+        console.log('숏 스탑로스 설정 완료:', shortStopOrder);
 
-      // 스탑로스 주문 내역 저장
-      addOrder({
-        symbol,
-        side: 'BUY',
-        type: 'STOP_MARKET',
-        quantity: shortQuantity,
-        stopPrice: shortStopLoss,
-        status: 'pending',
-        orderId: shortStopOrder.orderId,
-        isAutoTrading: true,
-        pairId: shortPairId,
-      });
+        // 스탑로스 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'BUY',
+          type: 'STOP_MARKET',
+          quantity: shortQuantity,
+          stopPrice: shortStopLoss,
+          status: 'pending',
+          orderId: shortStopOrder.orderId,
+          isAutoTrading: true,
+          pairId: shortPairId,
+        });
+      }
+
+      // 숏 테이크프로핏 주문
+      if (shortTakeProfit) {
+        const shortTakeProfitOrder = await BinanceFuturesAPI.createOrder({
+          symbol,
+          side: 'BUY',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: shortQuantity,
+          stopPrice: shortTakeProfit,
+        });
+        console.log('숏 테이크프로핏 설정 완료:', shortTakeProfitOrder);
+
+        // 테이크프로핏 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'BUY',
+          type: 'TAKE_PROFIT_MARKET',
+          quantity: shortQuantity,
+          takeProfitPrice: shortTakeProfit,
+          status: 'pending',
+          orderId: shortTakeProfitOrder.orderId,
+          isAutoTrading: true,
+          pairId: shortPairId,
+        });
+      }
 
       console.log('=== 자동 거래 완료 ===');
       showSuccess('자동 거래 주문이 생성되었습니다.', '자동 거래');

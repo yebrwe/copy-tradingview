@@ -6,6 +6,7 @@ interface OrderPair {
   pairId: string;
   entryOrder: OrderHistory;
   stopLossOrder?: OrderHistory;
+  takeProfitOrder?: OrderHistory;
   timestamp: number;
 }
 
@@ -18,7 +19,7 @@ export const OrderHistoryPanel = () => {
 
   // 주문을 pairId로 그룹핑
   const groupOrdersByPair = (): OrderPair[] => {
-    const pairMap = new Map<string, { entry?: OrderHistory; stopLoss?: OrderHistory }>();
+    const pairMap = new Map<string, { entry?: OrderHistory; stopLoss?: OrderHistory; takeProfit?: OrderHistory }>();
 
     orders.forEach((order) => {
       if (order.pairId) {
@@ -27,6 +28,8 @@ export const OrderHistoryPanel = () => {
           existing.entry = order;
         } else if (order.type === 'STOP_MARKET') {
           existing.stopLoss = order;
+        } else if (order.type === 'TAKE_PROFIT_MARKET') {
+          existing.takeProfit = order;
         }
         pairMap.set(order.pairId, existing);
       }
@@ -39,6 +42,7 @@ export const OrderHistoryPanel = () => {
           pairId: key,
           entryOrder: value.entry,
           stopLossOrder: value.stopLoss,
+          takeProfitOrder: value.takeProfit,
           timestamp: value.entry.timestamp,
         });
       }
@@ -82,7 +86,7 @@ export const OrderHistoryPanel = () => {
                 </div>
 
                 {/* 주문 정보 */}
-                <div className="flex-1 grid grid-cols-3 gap-2">
+                <div className="flex-1 grid grid-cols-4 gap-2">
                   <div>
                     <div className="text-gray-400 text-xs">진입</div>
                     <div className="text-white font-semibold">
@@ -90,12 +94,31 @@ export const OrderHistoryPanel = () => {
                     </div>
                   </div>
 
-                  {pair.stopLossOrder && (
+                  {pair.stopLossOrder ? (
                     <div>
                       <div className="text-gray-400 text-xs">스탑로스</div>
                       <div className="text-orange-400 font-semibold">
                         ${pair.stopLossOrder.stopPrice?.toFixed(2)}
                       </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-gray-400 text-xs">스탑로스</div>
+                      <div className="text-gray-500 text-xs">-</div>
+                    </div>
+                  )}
+
+                  {pair.takeProfitOrder ? (
+                    <div>
+                      <div className="text-gray-400 text-xs">TP</div>
+                      <div className="text-green-400 font-semibold">
+                        ${pair.takeProfitOrder.takeProfitPrice?.toFixed(2)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-gray-400 text-xs">TP</div>
+                      <div className="text-gray-500 text-xs">-</div>
                     </div>
                   )}
 
