@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BinanceFuturesAPI } from '../../services/binanceFuturesAPI';
 import { useChartStore } from '../../store/chartStore';
 import { useAutoTrading } from '../../hooks/useAutoTrading';
+import { useToastStore } from '../../store/toastStore';
 
 // localStorage 키
 const STORAGE_KEYS = {
@@ -20,6 +21,7 @@ const STORAGE_KEYS = {
 
 export const TradingPanel = () => {
   const { symbol, highChannelEntryPoints } = useChartStore();
+  const { showSuccess, showError, showWarning } = useToastStore();
 
   // localStorage에서 값 불러오기
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
@@ -122,7 +124,7 @@ export const TradingPanel = () => {
       }
     } catch (error: any) {
       console.error('잔고 조회 에러:', error);
-      alert(`잔고 조회 실패: ${error.message}`);
+      showError(`잔고 조회 실패: ${error.message}`);
     } finally {
       setIsLoadingBalance(false);
     }
@@ -148,7 +150,7 @@ export const TradingPanel = () => {
   const handleUpdateLeverage = async () => {
     const newLeverage = parseInt(leverage);
     if (isNaN(newLeverage) || newLeverage < 1 || newLeverage > 125) {
-      alert('레버리지는 1~125 사이의 값이어야 합니다.');
+      showWarning('레버리지는 1~125 사이의 값이어야 합니다.');
       return;
     }
 
@@ -156,9 +158,9 @@ export const TradingPanel = () => {
     try {
       await BinanceFuturesAPI.setLeverage(symbol, newLeverage);
       setCurrentBinanceLeverage(newLeverage);
-      alert(`레버리지가 ${newLeverage}배로 설정되었습니다.`);
+      showSuccess(`레버리지가 ${newLeverage}배로 설정되었습니다.`);
     } catch (error: any) {
-      alert(`레버리지 설정 실패: ${error.message}`);
+      showError(`레버리지 설정 실패: ${error.message}`);
       console.error('레버리지 설정 에러:', error);
     } finally {
       setIsLoadingLeverage(false);
@@ -194,7 +196,7 @@ export const TradingPanel = () => {
   // API 자격 증명 설정
   const handleConfigureApi = async () => {
     if (!apiKey || !apiSecret) {
-      alert('API Key와 Secret을 입력해주세요.');
+      showWarning('API Key와 Secret을 입력해주세요.');
       return;
     }
 
@@ -204,18 +206,18 @@ export const TradingPanel = () => {
     // 잔고 및 레버리지 조회
     await Promise.all([fetchBalance(), fetchLeverage()]);
 
-    alert('API 설정이 완료되었습니다.');
+    showSuccess('API 설정이 완료되었습니다.');
   };
 
   // 롱 진입
   const handleLongEntry = async () => {
     if (!isApiConfigured) {
-      alert('먼저 API를 설정해주세요.');
+      showWarning('먼저 API를 설정해주세요.');
       return;
     }
 
     if (!highChannelEntryPoints.longEntry) {
-      alert('진입점이 계산되지 않았습니다.');
+      showWarning('진입점이 계산되지 않았습니다.');
       return;
     }
 
@@ -234,10 +236,10 @@ export const TradingPanel = () => {
       // 진입 후 잔고 갱신
       await fetchBalance();
 
-      alert(`롱 포지션 진입 성공!\n진입가: $${entryPrice.toFixed(2)}\n수량: ${qty.toFixed(4)} ETH`);
+      showSuccess(`롱 포지션 진입 성공! 진입가: $${entryPrice.toFixed(2)}, 수량: ${qty.toFixed(4)} ETH`, '롱 진입 완료');
       console.log('롱 진입 결과:', result);
     } catch (error: any) {
-      alert(`롱 진입 실패: ${error.message}`);
+      showError(`롱 진입 실패: ${error.message}`);
       console.error('롱 진입 에러:', error);
     } finally {
       setIsTrading(false);
@@ -247,12 +249,12 @@ export const TradingPanel = () => {
   // 숏 진입
   const handleShortEntry = async () => {
     if (!isApiConfigured) {
-      alert('먼저 API를 설정해주세요.');
+      showWarning('먼저 API를 설정해주세요.');
       return;
     }
 
     if (!highChannelEntryPoints.shortEntry) {
-      alert('진입점이 계산되지 않았습니다.');
+      showWarning('진입점이 계산되지 않았습니다.');
       return;
     }
 
@@ -271,10 +273,10 @@ export const TradingPanel = () => {
       // 진입 후 잔고 갱신
       await fetchBalance();
 
-      alert(`숏 포지션 진입 성공!\n진입가: $${entryPrice.toFixed(2)}\n수량: ${qty.toFixed(4)} ETH`);
+      showSuccess(`숏 포지션 진입 성공! 진입가: $${entryPrice.toFixed(2)}, 수량: ${qty.toFixed(4)} ETH`, '숏 진입 완료');
       console.log('숏 진입 결과:', result);
     } catch (error: any) {
-      alert(`숏 진입 실패: ${error.message}`);
+      showError(`숏 진입 실패: ${error.message}`);
       console.error('숏 진입 에러:', error);
     } finally {
       setIsTrading(false);

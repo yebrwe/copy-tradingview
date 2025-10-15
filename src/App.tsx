@@ -2,6 +2,7 @@ import { TradingChart } from './components/Chart/TradingChart';
 import { TimeframeSelector } from './components/Chart/TimeframeSelector';
 import { Toolbar } from './components/Chart/Toolbar';
 import { TradingPanel } from './components/Trading/TradingPanel';
+import { Toast } from './components/Toast/Toast';
 import { useBinanceWebSocket } from './hooks/useBinanceWebSocket';
 import { useChartStore } from './store/chartStore';
 
@@ -13,6 +14,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
+      <Toast />
       <div className="max-w-[1600px] mx-auto">
         {/* 헤더 */}
         <div className="mb-4">

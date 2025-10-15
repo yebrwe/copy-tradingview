@@ -8,6 +8,18 @@ interface BinanceFuturesConfig {
   apiSecret: string;
 }
 
+interface SymbolInfo {
+  symbol: string;
+  quantityPrecision: number;
+  pricePrecision: number;
+  stepSize: string;
+  minQty: string;
+  maxQty: string;
+}
+
+// 심볼 정보 캐시
+const symbolInfoCache: Map<string, SymbolInfo> = new Map();
+
 // API Key 설정 (환경 변수 또는 설정에서 가져오기)
 let config: BinanceFuturesConfig = {
   apiKey: '',
@@ -35,6 +47,70 @@ const getHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
+/**
+ * 심볼 정보 조회 (exchangeInfo)
+ */
+export const getSymbolInfo = async (symbol: string): Promise<SymbolInfo> => {
+  // 캐시에서 먼저 확인
+  if (symbolInfoCache.has(symbol)) {
+    return symbolInfoCache.get(symbol)!;
+  }
+
+  try {
+    const response = await fetch(`${FUTURES_API_BASE_URL}/fapi/v1/exchangeInfo`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch exchange info');
+    }
+
+    const data = await response.json();
+    const symbolData = data.symbols.find((s: any) => s.symbol === symbol);
+
+    if (!symbolData) {
+      throw new Error(`Symbol ${symbol} not found`);
+    }
+
+    // LOT_SIZE 필터에서 stepSize, minQty, maxQty 추출
+    const lotSizeFilter = symbolData.filters.find((f: any) => f.filterType === 'LOT_SIZE');
+
+    const info: SymbolInfo = {
+      symbol,
+      quantityPrecision: symbolData.quantityPrecision,
+      pricePrecision: symbolData.pricePrecision,
+      stepSize: lotSizeFilter?.stepSize || '1',
+      minQty: lotSizeFilter?.minQty || '0',
+      maxQty: lotSizeFilter?.maxQty || '10000000',
+    };
+
+    // 캐시에 저장
+    symbolInfoCache.set(symbol, info);
+    return info;
+  } catch (error) {
+    console.error('Get symbol info error:', error);
+    throw error;
+  }
+};
+
+/**
+ * 수량을 심볼의 stepSize에 맞춰 조정
+ */
+export const adjustQuantityPrecision = (quantity: number, stepSize: string): number => {
+  const stepSizeNum = parseFloat(stepSize);
+  const precision = stepSize.indexOf('1') - 1;
+
+  // stepSize에 맞춰 반올림
+  const adjusted = Math.floor(quantity / stepSizeNum) * stepSizeNum;
+
+  // 정밀도에 맞춰 반올림
+  return parseFloat(adjusted.toFixed(Math.abs(precision)));
+};
+
+/**
+ * 가격을 심볼의 pricePrecision에 맞춰 조정
+ */
+export const adjustPricePrecision = (price: number, pricePrecision: number): number => {
+  return parseFloat(price.toFixed(pricePrecision));
+};
+
 interface OrderParams {
   symbol: string;
   side: 'BUY' | 'SELL';
@@ -53,6 +129,23 @@ const createOrder = async (params: OrderParams) => {
     throw new Error('API credentials not set. Please call setApiCredentials first.');
   }
 
+  // 심볼 정보 조회 및 정밀도 조정
+  const symbolInfo = await getSymbolInfo(params.symbol);
+
+  // 수량 조정
+  let adjustedQuantity = adjustQuantityPrecision(params.quantity, symbolInfo.stepSize);
+
+  // 최소/최대 수량 검증
+  const minQty = parseFloat(symbolInfo.minQty);
+  const maxQty = parseFloat(symbolInfo.maxQty);
+
+  if (adjustedQuantity < minQty) {
+    throw new Error(`수량이 최소값(${minQty})보다 작습니다. 현재: ${adjustedQuantity}`);
+  }
+  if (adjustedQuantity > maxQty) {
+    throw new Error(`수량이 최대값(${maxQty})을 초과합니다. 현재: ${adjustedQuantity}`);
+  }
+
   const timestamp = getTimestamp();
 
   // 쿼리 파라미터 구성
@@ -60,12 +153,16 @@ const createOrder = async (params: OrderParams) => {
     symbol: params.symbol,
     side: params.side,
     type: params.type,
-    quantity: params.quantity,
+    quantity: adjustedQuantity,
     timestamp,
   };
 
-  if (params.price) queryParams.price = params.price;
-  if (params.stopPrice) queryParams.stopPrice = params.stopPrice;
+  if (params.price) {
+    queryParams.price = adjustPricePrecision(params.price, symbolInfo.pricePrecision);
+  }
+  if (params.stopPrice) {
+    queryParams.stopPrice = adjustPricePrecision(params.stopPrice, symbolInfo.pricePrecision);
+  }
   if (params.timeInForce) queryParams.timeInForce = params.timeInForce;
 
   // 쿼리 스트링 생성
@@ -478,4 +575,7 @@ export const BinanceFuturesAPI = {
   cancelAllOpenOrders,
   createLimitOrder,
   createOrder,
+  getSymbolInfo,
+  adjustQuantityPrecision,
+  adjustPricePrecision,
 };

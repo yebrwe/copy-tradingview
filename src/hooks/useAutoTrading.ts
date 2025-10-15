@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useChartStore } from '../store/chartStore';
 import { BinanceFuturesAPI } from '../services/binanceFuturesAPI';
+import { useToastStore } from '../store/toastStore';
 
 interface AutoTradingConfig {
   enabled: boolean;
@@ -21,6 +22,7 @@ const TAKER_FEE = 0.0004; // 0.04%
  */
 export const useAutoTrading = (config: AutoTradingConfig) => {
   const { symbol, candlestickData, highChannelEntryPoints } = useChartStore();
+  const { showError } = useToastStore();
   const lastCandleTimeRef = useRef<number | null>(null);
   const isInitializedRef = useRef(false);
 
@@ -145,7 +147,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       console.log('=== 자동 거래 완료 ===');
     } catch (error: any) {
       console.error('자동 거래 실패:', error);
-      alert(`자동 거래 실패: ${error.message}`);
+      showError(`자동 거래 실패: ${error.message}`);
     }
   };
 
