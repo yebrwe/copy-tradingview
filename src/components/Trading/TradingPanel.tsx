@@ -130,6 +130,7 @@ export const TradingPanel = () => {
     usePercentage: usePercentage,
     accountPercentage: parseFloat(accountPercentage),
     balance: balance || undefined,
+    onBalanceUpdate: setBalance,
   });
 
   // 자동 거래 토글 ON 시 즉시 실행

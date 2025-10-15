@@ -15,6 +15,7 @@ interface AutoTradingConfig {
   usePercentage?: boolean;
   accountPercentage?: number;
   balance?: number;
+  onBalanceUpdate?: (balance: number) => void;
 }
 
 // 바이낸스 선물 수수료율
@@ -129,6 +130,10 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
           if (usdtBalance) {
             currentBalance = parseFloat(usdtBalance.availableBalance);
             console.log('현재 잔고:', currentBalance, 'USDT');
+            // 잔고 업데이트 콜백 호출
+            if (config.onBalanceUpdate) {
+              config.onBalanceUpdate(currentBalance);
+            }
           }
         } catch (error) {
           console.warn('잔고 조회 실패, 기존 값 사용:', error);
