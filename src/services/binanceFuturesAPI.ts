@@ -266,6 +266,48 @@ export const getAccountBalance = async () => {
 };
 
 /**
+ * 레버리지 조회
+ */
+export const getLeverage = async (symbol: string) => {
+  if (!config.apiKey || !config.apiSecret) {
+    throw new Error('API credentials not set.');
+  }
+
+  const timestamp = getTimestamp();
+  const queryString = `symbol=${symbol}&timestamp=${timestamp}`;
+  const signature = createSignature(queryString);
+
+  try {
+    const response = await fetch(
+      `${FUTURES_API_BASE_URL}/fapi/v2/positionRisk?${queryString}&signature=${signature}`,
+      {
+        method: 'GET',
+        headers: getHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Binance API Error: ${error.msg || response.statusText}`);
+    }
+
+    const positions = await response.json();
+    // 해당 심볼의 포지션 정보 찾기
+    const position = positions.find((p: any) => p.symbol === symbol);
+
+    if (position) {
+      return parseInt(position.leverage);
+    }
+
+    // 포지션이 없으면 기본값 1 반환
+    return 1;
+  } catch (error) {
+    console.error('Get leverage error:', error);
+    throw error;
+  }
+};
+
+/**
  * 레버리지 설정
  */
 export const setLeverage = async (symbol: string, leverage: number) => {
@@ -424,6 +466,7 @@ export const createLimitOrder = async (
 
 export const BinanceFuturesAPI = {
   setApiCredentials,
+  getLeverage,
   setLeverage,
   enterLongPosition,
   enterShortPosition,

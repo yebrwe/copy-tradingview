@@ -53,6 +53,10 @@ export const TradingPanel = () => {
     localStorage.getItem(STORAGE_KEYS.ACCOUNT_PERCENTAGE) || '10'
   );
 
+  // 레버리지 관련
+  const [currentBinanceLeverage, setCurrentBinanceLeverage] = useState<number | null>(null);
+  const [isLoadingLeverage, setIsLoadingLeverage] = useState(false);
+
   // localStorage에 값 저장
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
@@ -124,6 +128,43 @@ export const TradingPanel = () => {
     }
   };
 
+  // 레버리지 조회
+  const fetchLeverage = async () => {
+    setIsLoadingLeverage(true);
+    try {
+      const currentLeverage = await BinanceFuturesAPI.getLeverage(symbol);
+      setCurrentBinanceLeverage(currentLeverage);
+      // 조회한 레버리지로 입력값도 업데이트
+      setLeverage(String(currentLeverage));
+    } catch (error: any) {
+      console.error('레버리지 조회 에러:', error);
+      console.log('레버리지 조회 실패, 기본값 사용');
+    } finally {
+      setIsLoadingLeverage(false);
+    }
+  };
+
+  // 레버리지 설정
+  const handleUpdateLeverage = async () => {
+    const newLeverage = parseInt(leverage);
+    if (isNaN(newLeverage) || newLeverage < 1 || newLeverage > 125) {
+      alert('레버리지는 1~125 사이의 값이어야 합니다.');
+      return;
+    }
+
+    setIsLoadingLeverage(true);
+    try {
+      await BinanceFuturesAPI.setLeverage(symbol, newLeverage);
+      setCurrentBinanceLeverage(newLeverage);
+      alert(`레버리지가 ${newLeverage}배로 설정되었습니다.`);
+    } catch (error: any) {
+      alert(`레버리지 설정 실패: ${error.message}`);
+      console.error('레버리지 설정 에러:', error);
+    } finally {
+      setIsLoadingLeverage(false);
+    }
+  };
+
   // 비율로 수량 계산
   const calculateQuantityFromPercentage = (currentPrice: number) => {
     if (!balance || !usePercentage) return parseFloat(quantity);
@@ -145,6 +186,7 @@ export const TradingPanel = () => {
     if (isApiConfigured && apiKey && apiSecret) {
       BinanceFuturesAPI.setApiCredentials(apiKey, apiSecret);
       fetchBalance();
+      fetchLeverage();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 초기 마운트 시에만 실행
@@ -159,8 +201,8 @@ export const TradingPanel = () => {
     BinanceFuturesAPI.setApiCredentials(apiKey, apiSecret);
     setIsApiConfigured(true);
 
-    // 잔고 조회
-    await fetchBalance();
+    // 잔고 및 레버리지 조회
+    await Promise.all([fetchBalance(), fetchLeverage()]);
 
     alert('API 설정이 완료되었습니다.');
   };
@@ -361,16 +403,35 @@ export const TradingPanel = () => {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">레버리지 (배수)</label>
-            <input
-              type="number"
-              value={leverage}
-              onChange={(e) => setLeverage(e.target.value)}
-              step="1"
-              min="1"
-              max="125"
-              className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm text-gray-400">레버리지 (배수)</label>
+              {currentBinanceLeverage !== null && (
+                <span className="text-xs text-blue-400">
+                  현재: {currentBinanceLeverage}배
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={leverage}
+                onChange={(e) => setLeverage(e.target.value)}
+                step="1"
+                min="1"
+                max="125"
+                className="flex-1 px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                onClick={handleUpdateLeverage}
+                disabled={isLoadingLeverage || currentBinanceLeverage === parseInt(leverage)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                {isLoadingLeverage ? '...' : '적용'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              1~125배 사이로 설정 가능. 변경 후 '적용' 버튼 클릭
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
