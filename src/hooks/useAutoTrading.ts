@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useChartStore } from '../store/chartStore';
 import { BinanceFuturesAPI } from '../services/binanceFuturesAPI';
 import { useToastStore } from '../store/toastStore';
+import { useOrderHistoryStore } from '../store/orderHistoryStore';
 
 interface AutoTradingConfig {
   enabled: boolean;
@@ -22,7 +23,8 @@ const TAKER_FEE = 0.0004; // 0.04%
  */
 export const useAutoTrading = (config: AutoTradingConfig) => {
   const { symbol, candlestickData, highChannelEntryPoints } = useChartStore();
-  const { showError } = useToastStore();
+  const { showError, showSuccess } = useToastStore();
+  const { addOrder } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
   const isInitializedRef = useRef(false);
 
@@ -90,11 +92,11 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       console.log('이전 미체결 주문 취소 중...');
       await BinanceFuturesAPI.cancelAllOpenOrders(symbol);
 
-      // 3. 롱 진입 주문 생성
+      // 3. 롱 진입 리밋 주문 생성
       const longEntry = highChannelEntryPoints.longEntry;
       const longStopLoss = longEntry * (1 - config.stopLossPercent / 100);
 
-      console.log(`롱 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss.toFixed(2)}`);
+      console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss.toFixed(2)}`);
 
       const longMetrics = calculateTradingMetrics(longEntry, longStopLoss, config.quantity);
       console.log('롱 포지션 지표:', longMetrics);
@@ -105,7 +107,19 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         config.quantity,
         longEntry
       );
-      console.log('롱 주문 생성 완료:', longOrder);
+      console.log('롱 리밋 주문 생성 완료:', longOrder);
+
+      // 주문 내역 저장
+      addOrder({
+        symbol,
+        side: 'BUY',
+        type: 'LIMIT',
+        quantity: config.quantity,
+        price: longEntry,
+        status: 'pending',
+        orderId: longOrder.orderId,
+        isAutoTrading: true,
+      });
 
       // 롱 스탑로스 주문
       const longStopOrder = await BinanceFuturesAPI.createOrder({
@@ -117,11 +131,23 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       });
       console.log('롱 스탑로스 설정 완료:', longStopOrder);
 
-      // 4. 숏 진입 주문 생성
+      // 스탑로스 주문 내역 저장
+      addOrder({
+        symbol,
+        side: 'SELL',
+        type: 'STOP_MARKET',
+        quantity: config.quantity,
+        stopPrice: longStopLoss,
+        status: 'pending',
+        orderId: longStopOrder.orderId,
+        isAutoTrading: true,
+      });
+
+      // 4. 숏 진입 리밋 주문 생성
       const shortEntry = highChannelEntryPoints.shortEntry;
       const shortStopLoss = shortEntry * (1 + config.stopLossPercent / 100);
 
-      console.log(`숏 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss.toFixed(2)}`);
+      console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss.toFixed(2)}`);
 
       const shortMetrics = calculateTradingMetrics(shortEntry, shortStopLoss, config.quantity);
       console.log('숏 포지션 지표:', shortMetrics);
@@ -132,7 +158,19 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         config.quantity,
         shortEntry
       );
-      console.log('숏 주문 생성 완료:', shortOrder);
+      console.log('숏 리밋 주문 생성 완료:', shortOrder);
+
+      // 주문 내역 저장
+      addOrder({
+        symbol,
+        side: 'SELL',
+        type: 'LIMIT',
+        quantity: config.quantity,
+        price: shortEntry,
+        status: 'pending',
+        orderId: shortOrder.orderId,
+        isAutoTrading: true,
+      });
 
       // 숏 스탑로스 주문
       const shortStopOrder = await BinanceFuturesAPI.createOrder({
@@ -144,7 +182,20 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       });
       console.log('숏 스탑로스 설정 완료:', shortStopOrder);
 
+      // 스탑로스 주문 내역 저장
+      addOrder({
+        symbol,
+        side: 'BUY',
+        type: 'STOP_MARKET',
+        quantity: config.quantity,
+        stopPrice: shortStopLoss,
+        status: 'pending',
+        orderId: shortStopOrder.orderId,
+        isAutoTrading: true,
+      });
+
       console.log('=== 자동 거래 완료 ===');
+      showSuccess('자동 거래 주문이 생성되었습니다.', '자동 거래');
     } catch (error: any) {
       console.error('자동 거래 실패:', error);
       showError(`자동 거래 실패: ${error.message}`);

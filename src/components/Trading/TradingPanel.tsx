@@ -3,6 +3,7 @@ import { BinanceFuturesAPI } from '../../services/binanceFuturesAPI';
 import { useChartStore } from '../../store/chartStore';
 import { useAutoTrading } from '../../hooks/useAutoTrading';
 import { useToastStore } from '../../store/toastStore';
+import { useOrderHistoryStore } from '../../store/orderHistoryStore';
 
 // localStorage 키
 const STORAGE_KEYS = {
@@ -22,6 +23,7 @@ const STORAGE_KEYS = {
 export const TradingPanel = () => {
   const { symbol, highChannelEntryPoints } = useChartStore();
   const { showSuccess, showError, showWarning } = useToastStore();
+  const { orders, addOrder, loadFromStorage, clearHistory } = useOrderHistoryStore();
 
   // localStorage에서 값 불러오기
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
@@ -185,6 +187,9 @@ export const TradingPanel = () => {
 
   // API 설정이 저장되어 있으면 자동으로 설정
   useEffect(() => {
+    // 주문 내역 로드
+    loadFromStorage();
+
     if (isApiConfigured && apiKey && apiSecret) {
       BinanceFuturesAPI.setApiCredentials(apiKey, apiSecret);
       fetchBalance();
@@ -240,6 +245,18 @@ export const TradingPanel = () => {
       );
       console.log('롱 리밋 주문 생성 완료:', limitOrder);
 
+      // 주문 내역 저장
+      addOrder({
+        symbol,
+        side: 'BUY',
+        type: 'LIMIT',
+        quantity: qty,
+        price: entryPrice,
+        status: 'pending',
+        orderId: limitOrder.orderId,
+        isAutoTrading: false,
+      });
+
       // 스탑로스 주문 생성
       if (stopLoss) {
         const stopLossOrder = await BinanceFuturesAPI.createOrder({
@@ -250,6 +267,18 @@ export const TradingPanel = () => {
           stopPrice: stopLoss,
         });
         console.log('롱 스탑로스 설정 완료:', stopLossOrder);
+
+        // 스탑로스 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'SELL',
+          type: 'STOP_MARKET',
+          quantity: qty,
+          stopPrice: stopLoss,
+          status: 'pending',
+          orderId: stopLossOrder.orderId,
+          isAutoTrading: false,
+        });
       }
 
       // 진입 후 잔고 갱신
@@ -295,6 +324,18 @@ export const TradingPanel = () => {
       );
       console.log('숏 리밋 주문 생성 완료:', limitOrder);
 
+      // 주문 내역 저장
+      addOrder({
+        symbol,
+        side: 'SELL',
+        type: 'LIMIT',
+        quantity: qty,
+        price: entryPrice,
+        status: 'pending',
+        orderId: limitOrder.orderId,
+        isAutoTrading: false,
+      });
+
       // 스탑로스 주문 생성
       if (stopLoss) {
         const stopLossOrder = await BinanceFuturesAPI.createOrder({
@@ -305,6 +346,18 @@ export const TradingPanel = () => {
           stopPrice: stopLoss,
         });
         console.log('숏 스탑로스 설정 완료:', stopLossOrder);
+
+        // 스탑로스 주문 내역 저장
+        addOrder({
+          symbol,
+          side: 'BUY',
+          type: 'STOP_MARKET',
+          quantity: qty,
+          stopPrice: stopLoss,
+          status: 'pending',
+          orderId: stopLossOrder.orderId,
+          isAutoTrading: false,
+        });
       }
 
       // 진입 후 잔고 갱신
@@ -587,6 +640,54 @@ export const TradingPanel = () => {
           >
             API 재설정
           </button>
+
+          {/* 주문 내역 */}
+          {orders.length > 0 && (
+            <div className="mt-4 border-t border-gray-600 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">주문 내역</h3>
+                <button
+                  onClick={clearHistory}
+                  className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
+                >
+                  전체 삭제
+                </button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {orders.slice(0, 10).map((order) => (
+                  <div key={order.id} className="bg-gray-700 rounded p-2 text-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-semibold ${order.side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
+                          {order.side}
+                        </span>
+                        <span className="text-gray-400">{order.type}</span>
+                        {order.isAutoTrading && (
+                          <span className="text-xs bg-blue-600 px-1 rounded">AUTO</span>
+                        )}
+                      </div>
+                      <span className="text-gray-500">
+                        {new Date(order.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div className="text-gray-300">
+                      수량: {order.quantity.toFixed(4)} {order.symbol}
+                    </div>
+                    {order.price && (
+                      <div className="text-gray-300">
+                        가격: ${order.price.toFixed(2)}
+                      </div>
+                    )}
+                    {order.stopPrice && (
+                      <div className="text-gray-300">
+                        스탑: ${order.stopPrice.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
