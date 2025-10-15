@@ -290,54 +290,74 @@ export const TradingPanel = () => {
 
       // 스탑로스 주문 생성
       if (stopLoss) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const stopLossOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'SELL',
-          type: 'STOP_MARKET',
-          quantity: qty,
-          stopPrice: stopLoss,
-        });
-        console.log('롱 스탑로스 설정 완료:', stopLossOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const stopLossOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'SELL',
+            type: 'STOP_MARKET',
+            quantity: qty,
+            stopPrice: stopLoss,
+          });
+          console.log('롱 스탑로스 설정 완료:', stopLossOrder);
 
-        // 스탑로스 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'SELL',
-          type: 'STOP_MARKET',
-          quantity: qty,
-          stopPrice: stopLoss,
-          status: 'pending',
-          orderId: stopLossOrder.orderId,
-          isAutoTrading: false,
-          pairId,
-        });
+          // 스탑로스 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'SELL',
+            type: 'STOP_MARKET',
+            quantity: qty,
+            stopPrice: stopLoss,
+            status: 'pending',
+            orderId: stopLossOrder.orderId,
+            isAutoTrading: false,
+            pairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 표시
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('스탑로스 주문 스킵 (가격 조건 불일치):', error.message);
+            showWarning('스탑로스 주문이 스킵되었습니다 (가격 조건 불일치)');
+          } else {
+            throw error; // 다른 에러는 상위로 전파
+          }
+        }
       }
 
       // 테이크프로핏 주문 생성
       if (takeProfit) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const takeProfitOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'SELL',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: qty,
-          stopPrice: takeProfit,
-        });
-        console.log('롱 테이크프로핏 설정 완료:', takeProfitOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const takeProfitOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'SELL',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: qty,
+            stopPrice: takeProfit,
+          });
+          console.log('롱 테이크프로핏 설정 완료:', takeProfitOrder);
 
-        // 테이크프로핏 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'SELL',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: qty,
-          takeProfitPrice: takeProfit,
-          status: 'pending',
-          orderId: takeProfitOrder.orderId,
-          isAutoTrading: false,
-          pairId,
-        });
+          // 테이크프로핏 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'SELL',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: qty,
+            takeProfitPrice: takeProfit,
+            status: 'pending',
+            orderId: takeProfitOrder.orderId,
+            isAutoTrading: false,
+            pairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 표시
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
+            showWarning('테이크프로핏 주문이 스킵되었습니다 (가격 조건 불일치)');
+          } else {
+            throw error; // 다른 에러는 상위로 전파
+          }
+        }
       }
 
       // 진입 후 잔고 갱신
@@ -404,54 +424,74 @@ export const TradingPanel = () => {
 
       // 스탑로스 주문 생성
       if (stopLoss) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const stopLossOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'BUY',
-          type: 'STOP_MARKET',
-          quantity: qty,
-          stopPrice: stopLoss,
-        });
-        console.log('숏 스탑로스 설정 완료:', stopLossOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const stopLossOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'BUY',
+            type: 'STOP_MARKET',
+            quantity: qty,
+            stopPrice: stopLoss,
+          });
+          console.log('숏 스탑로스 설정 완료:', stopLossOrder);
 
-        // 스탑로스 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'BUY',
-          type: 'STOP_MARKET',
-          quantity: qty,
-          stopPrice: stopLoss,
-          status: 'pending',
-          orderId: stopLossOrder.orderId,
-          isAutoTrading: false,
-          pairId,
-        });
+          // 스탑로스 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'BUY',
+            type: 'STOP_MARKET',
+            quantity: qty,
+            stopPrice: stopLoss,
+            status: 'pending',
+            orderId: stopLossOrder.orderId,
+            isAutoTrading: false,
+            pairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 표시
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('스탑로스 주문 스킵 (가격 조건 불일치):', error.message);
+            showWarning('스탑로스 주문이 스킵되었습니다 (가격 조건 불일치)');
+          } else {
+            throw error; // 다른 에러는 상위로 전파
+          }
+        }
       }
 
       // 테이크프로핏 주문 생성
       if (takeProfit) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const takeProfitOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'BUY',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: qty,
-          stopPrice: takeProfit,
-        });
-        console.log('숏 테이크프로핏 설정 완료:', takeProfitOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const takeProfitOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'BUY',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: qty,
+            stopPrice: takeProfit,
+          });
+          console.log('숏 테이크프로핏 설정 완료:', takeProfitOrder);
 
-        // 테이크프로핏 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'BUY',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: qty,
-          takeProfitPrice: takeProfit,
-          status: 'pending',
-          orderId: takeProfitOrder.orderId,
-          isAutoTrading: false,
-          pairId,
-        });
+          // 테이크프로핏 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'BUY',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: qty,
+            takeProfitPrice: takeProfit,
+            status: 'pending',
+            orderId: takeProfitOrder.orderId,
+            isAutoTrading: false,
+            pairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 표시
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
+            showWarning('테이크프로핏 주문이 스킵되었습니다 (가격 조건 불일치)');
+          } else {
+            throw error; // 다른 에러는 상위로 전파
+          }
+        }
       }
 
       // 진입 후 잔고 갱신

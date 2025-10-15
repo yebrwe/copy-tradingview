@@ -165,54 +165,72 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 롱 스탑로스 주문
       if (longStopLoss) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const longStopOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'SELL',
-          type: 'STOP_MARKET',
-          quantity: longQuantity,
-          stopPrice: longStopLoss,
-        });
-        console.log('롱 스탑로스 설정 완료:', longStopOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const longStopOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'SELL',
+            type: 'STOP_MARKET',
+            quantity: longQuantity,
+            stopPrice: longStopLoss,
+          });
+          console.log('롱 스탑로스 설정 완료:', longStopOrder);
 
-        // 스탑로스 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'SELL',
-          type: 'STOP_MARKET',
-          quantity: longQuantity,
-          stopPrice: longStopLoss,
-          status: 'pending',
-          orderId: longStopOrder.orderId,
-          isAutoTrading: true,
-          pairId: longPairId,
-        });
+          // 스탑로스 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'SELL',
+            type: 'STOP_MARKET',
+            quantity: longQuantity,
+            stopPrice: longStopLoss,
+            status: 'pending',
+            orderId: longStopOrder.orderId,
+            isAutoTrading: true,
+            pairId: longPairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 로그
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('롱 스탑로스 주문 스킵 (가격 조건 불일치):', error.message);
+          } else {
+            console.error('롱 스탑로스 주문 실패:', error);
+          }
+        }
       }
 
       // 롱 테이크프로핏 주문
       if (longTakeProfit) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const longTakeProfitOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'SELL',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: longQuantity,
-          stopPrice: longTakeProfit,
-        });
-        console.log('롱 테이크프로핏 설정 완료:', longTakeProfitOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const longTakeProfitOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'SELL',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: longQuantity,
+            stopPrice: longTakeProfit,
+          });
+          console.log('롱 테이크프로핏 설정 완료:', longTakeProfitOrder);
 
-        // 테이크프로핏 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'SELL',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: longQuantity,
-          takeProfitPrice: longTakeProfit,
-          status: 'pending',
-          orderId: longTakeProfitOrder.orderId,
-          isAutoTrading: true,
-          pairId: longPairId,
-        });
+          // 테이크프로핏 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'SELL',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: longQuantity,
+            takeProfitPrice: longTakeProfit,
+            status: 'pending',
+            orderId: longTakeProfitOrder.orderId,
+            isAutoTrading: true,
+            pairId: longPairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 로그
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('롱 테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
+          } else {
+            console.error('롱 테이크프로핏 주문 실패:', error);
+          }
+        }
       }
 
       // 4. 숏 진입 리밋 주문 생성
@@ -257,54 +275,72 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 숏 스탑로스 주문
       if (shortStopLoss) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const shortStopOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'BUY',
-          type: 'STOP_MARKET',
-          quantity: shortQuantity,
-          stopPrice: shortStopLoss,
-        });
-        console.log('숏 스탑로스 설정 완료:', shortStopOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const shortStopOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'BUY',
+            type: 'STOP_MARKET',
+            quantity: shortQuantity,
+            stopPrice: shortStopLoss,
+          });
+          console.log('숏 스탑로스 설정 완료:', shortStopOrder);
 
-        // 스탑로스 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'BUY',
-          type: 'STOP_MARKET',
-          quantity: shortQuantity,
-          stopPrice: shortStopLoss,
-          status: 'pending',
-          orderId: shortStopOrder.orderId,
-          isAutoTrading: true,
-          pairId: shortPairId,
-        });
+          // 스탑로스 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'BUY',
+            type: 'STOP_MARKET',
+            quantity: shortQuantity,
+            stopPrice: shortStopLoss,
+            status: 'pending',
+            orderId: shortStopOrder.orderId,
+            isAutoTrading: true,
+            pairId: shortPairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 로그
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('숏 스탑로스 주문 스킵 (가격 조건 불일치):', error.message);
+          } else {
+            console.error('숏 스탑로스 주문 실패:', error);
+          }
+        }
       }
 
       // 숏 테이크프로핏 주문
       if (shortTakeProfit) {
-        await delay(API_CALL_DELAY); // API 호출 간 딜레이
-        const shortTakeProfitOrder = await BinanceFuturesAPI.createOrder({
-          symbol,
-          side: 'BUY',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: shortQuantity,
-          stopPrice: shortTakeProfit,
-        });
-        console.log('숏 테이크프로핏 설정 완료:', shortTakeProfitOrder);
+        try {
+          await delay(API_CALL_DELAY); // API 호출 간 딜레이
+          const shortTakeProfitOrder = await BinanceFuturesAPI.createOrder({
+            symbol,
+            side: 'BUY',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: shortQuantity,
+            stopPrice: shortTakeProfit,
+          });
+          console.log('숏 테이크프로핏 설정 완료:', shortTakeProfitOrder);
 
-        // 테이크프로핏 주문 내역 저장
-        addOrder({
-          symbol,
-          side: 'BUY',
-          type: 'TAKE_PROFIT_MARKET',
-          quantity: shortQuantity,
-          takeProfitPrice: shortTakeProfit,
-          status: 'pending',
-          orderId: shortTakeProfitOrder.orderId,
-          isAutoTrading: true,
-          pairId: shortPairId,
-        });
+          // 테이크프로핏 주문 내역 저장
+          addOrder({
+            symbol,
+            side: 'BUY',
+            type: 'TAKE_PROFIT_MARKET',
+            quantity: shortQuantity,
+            takeProfitPrice: shortTakeProfit,
+            status: 'pending',
+            orderId: shortTakeProfitOrder.orderId,
+            isAutoTrading: true,
+            pairId: shortPairId,
+          });
+        } catch (error: any) {
+          // -2021: Order would immediately trigger 에러는 경고만 로그
+          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+            console.warn('숏 테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
+          } else {
+            console.error('숏 테이크프로핏 주문 실패:', error);
+          }
+        }
       }
 
       console.log('=== 자동 거래 완료 ===');
