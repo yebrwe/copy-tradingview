@@ -1,6 +1,7 @@
 import { TradingChart } from './components/Chart/TradingChart';
 import { TimeframeSelector } from './components/Chart/TimeframeSelector';
 import { Toolbar } from './components/Chart/Toolbar';
+import { TradingPanel } from './components/Trading/TradingPanel';
 import { useBinanceWebSocket } from './hooks/useBinanceWebSocket';
 import { useChartStore } from './store/chartStore';
 
@@ -51,9 +52,19 @@ function App() {
           <TimeframeSelector />
         </div>
 
-        {/* 차트 영역 */}
-        <div className="relative bg-chart-bg rounded-lg overflow-hidden shadow-2xl">
-          <TradingChart />
+        {/* 차트 및 거래 영역 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* 차트 영역 */}
+          <div className="lg:col-span-2">
+            <div className="relative bg-chart-bg rounded-lg overflow-hidden shadow-2xl">
+              <TradingChart />
+            </div>
+          </div>
+
+          {/* 거래 패널 */}
+          <div className="lg:col-span-1">
+            <TradingPanel />
+          </div>
         </div>
 
         {/* 사용법 안내 */}
@@ -63,6 +74,8 @@ function App() {
             <li>최근 6시간과 15일 고점을 연결한 채널이 자동으로 생성됩니다</li>
             <li>차트에 진입점 마커가 표시됩니다 (▼ 숏 진입, ▲ 롱 진입)</li>
             <li>헤더에 실시간 진입점 가격이 표시됩니다</li>
+            <li>우측 거래 패널에서 바이낸스 선물 거래를 실행할 수 있습니다</li>
+            <li>API Key 설정 후 롱/숏 진입이 가능하며 자동 스탑로스 설정이 지원됩니다</li>
             <li>타임프레임 버튼을 클릭하여 차트 시간 간격을 변경할 수 있습니다</li>
             <li>실시간 가격 데이터가 바이낸스 WebSocket을 통해 업데이트됩니다</li>
           </ul>
