@@ -173,6 +173,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
             type: 'STOP_MARKET',
             quantity: longQuantity,
             stopPrice: longStopLoss,
+            reduceOnly: true,
           });
           console.log('롱 스탑로스 설정 완료:', longStopOrder);
 
@@ -208,6 +209,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
             type: 'TAKE_PROFIT_MARKET',
             quantity: longQuantity,
             stopPrice: longTakeProfit,
+            reduceOnly: true,
           });
           console.log('롱 테이크프로핏 설정 완료:', longTakeProfitOrder);
 
@@ -283,6 +285,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
             type: 'STOP_MARKET',
             quantity: shortQuantity,
             stopPrice: shortStopLoss,
+            reduceOnly: true,
           });
           console.log('숏 스탑로스 설정 완료:', shortStopOrder);
 
@@ -318,6 +321,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
             type: 'TAKE_PROFIT_MARKET',
             quantity: shortQuantity,
             stopPrice: shortTakeProfit,
+            reduceOnly: true,
           });
           console.log('숏 테이크프로핏 설정 완료:', shortTakeProfitOrder);
 

@@ -298,6 +298,7 @@ export const TradingPanel = () => {
             type: 'STOP_MARKET',
             quantity: qty,
             stopPrice: stopLoss,
+            reduceOnly: true,
           });
           console.log('롱 스탑로스 설정 완료:', stopLossOrder);
 
@@ -334,6 +335,7 @@ export const TradingPanel = () => {
             type: 'TAKE_PROFIT_MARKET',
             quantity: qty,
             stopPrice: takeProfit,
+            reduceOnly: true,
           });
           console.log('롱 테이크프로핏 설정 완료:', takeProfitOrder);
 
@@ -437,6 +439,7 @@ export const TradingPanel = () => {
             type: 'STOP_MARKET',
             quantity: qty,
             stopPrice: stopLoss,
+            reduceOnly: true,
           });
           console.log('숏 스탑로스 설정 완료:', stopLossOrder);
 
@@ -473,6 +476,7 @@ export const TradingPanel = () => {
             type: 'TAKE_PROFIT_MARKET',
             quantity: qty,
             stopPrice: takeProfit,
+            reduceOnly: true,
           });
           console.log('숏 테이크프로핏 설정 완료:', takeProfitOrder);
 

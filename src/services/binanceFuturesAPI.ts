@@ -114,11 +114,12 @@ export const adjustPricePrecision = (price: number, pricePrecision: number): num
 interface OrderParams {
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET';
+  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
   quantity: number;
   price?: number;
   stopPrice?: number;
   timeInForce?: 'GTC' | 'IOC' | 'FOK';
+  reduceOnly?: boolean;
 }
 
 /**
@@ -164,6 +165,13 @@ const createOrder = async (params: OrderParams) => {
     queryParams.stopPrice = adjustPricePrecision(params.stopPrice, symbolInfo.pricePrecision);
   }
   if (params.timeInForce) queryParams.timeInForce = params.timeInForce;
+
+  // STOP_MARKET과 TAKE_PROFIT_MARKET은 reduceOnly=true 필수
+  if (params.type === 'STOP_MARKET' || params.type === 'TAKE_PROFIT_MARKET') {
+    queryParams.reduceOnly = params.reduceOnly !== undefined ? params.reduceOnly : true;
+  } else if (params.reduceOnly !== undefined) {
+    queryParams.reduceOnly = params.reduceOnly;
+  }
 
   // 쿼리 스트링 생성
   const queryString = Object.keys(queryParams)
