@@ -11,6 +11,7 @@ export const useBinanceWebSocket = () => {
     setVolumeData,
     updateLastCandle,
     calculateHighChannelEntryPoints,
+    connectMajorPeaks,
   } = useChartStore();
 
   const wsServiceRef = useRef<WebSocketService | null>(null);
@@ -28,6 +29,11 @@ export const useBinanceWebSocket = () => {
           setCandlestickData(candlesticks);
           setVolumeData(volumes);
           console.log(`Loaded ${candlesticks.length} candles`);
+
+          // 데이터 로드 후 자동으로 고점 채널 생성
+          setTimeout(() => {
+            connectMajorPeaks();
+          }, 100);
         }
       } catch (error) {
         console.error('Failed to load historical data:', error);
@@ -69,7 +75,7 @@ export const useBinanceWebSocket = () => {
         wsServiceRef.current.disconnect();
       }
     };
-  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints]);
+  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints, connectMajorPeaks]);
 
   return null;
 };
