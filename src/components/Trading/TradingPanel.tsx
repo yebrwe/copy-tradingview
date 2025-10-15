@@ -112,6 +112,9 @@ export const TradingPanel = () => {
     leverage: parseInt(leverage),
     quantity: parseFloat(quantity),
     stopLossPercent: parseFloat(stopLossPercent),
+    usePercentage: usePercentage,
+    accountPercentage: parseFloat(accountPercentage),
+    balance: balance || undefined,
   });
 
   // 자동 거래 토글 ON 시 즉시 실행

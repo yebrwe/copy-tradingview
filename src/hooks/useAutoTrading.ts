@@ -9,6 +9,9 @@ interface AutoTradingConfig {
   leverage: number;
   quantity: number;
   stopLossPercent: number;
+  usePercentage?: boolean;
+  accountPercentage?: number;
+  balance?: number;
 }
 
 // 바이낸스 선물 수수료율
@@ -27,6 +30,28 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
   const { addOrder } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
   const isInitializedRef = useRef(false);
+
+  // 비율 기반 수량 계산
+  const calculateQuantityFromPercentage = (currentPrice: number): number => {
+    if (!config.usePercentage || !config.balance) {
+      return config.quantity;
+    }
+
+    const percentage = (config.accountPercentage || 10) / 100;
+    const availableMargin = config.balance * percentage;
+    const calculatedQty = (availableMargin * config.leverage) / currentPrice;
+
+    console.log('비율 기반 수량 계산:', {
+      balance: config.balance,
+      percentage: percentage * 100 + '%',
+      availableMargin,
+      leverage: config.leverage,
+      currentPrice,
+      calculatedQty,
+    });
+
+    return calculatedQty;
+  };
 
   // 레버리지 및 수수료 계산
   const calculateTradingMetrics = (
@@ -95,16 +120,17 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       // 3. 롱 진입 리밋 주문 생성
       const longEntry = highChannelEntryPoints.longEntry;
       const longStopLoss = longEntry * (1 - config.stopLossPercent / 100);
+      const longQuantity = calculateQuantityFromPercentage(longEntry);
 
-      console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss.toFixed(2)}`);
+      console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss.toFixed(2)}, 수량=${longQuantity.toFixed(4)}`);
 
-      const longMetrics = calculateTradingMetrics(longEntry, longStopLoss, config.quantity);
+      const longMetrics = calculateTradingMetrics(longEntry, longStopLoss, longQuantity);
       console.log('롱 포지션 지표:', longMetrics);
 
       const longOrder = await BinanceFuturesAPI.createLimitOrder(
         symbol,
         'BUY',
-        config.quantity,
+        longQuantity,
         longEntry
       );
       console.log('롱 리밋 주문 생성 완료:', longOrder);
@@ -114,7 +140,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         symbol,
         side: 'BUY',
         type: 'LIMIT',
-        quantity: config.quantity,
+        quantity: longQuantity,
         price: longEntry,
         status: 'pending',
         orderId: longOrder.orderId,
@@ -126,7 +152,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         symbol,
         side: 'SELL',
         type: 'STOP_MARKET',
-        quantity: config.quantity,
+        quantity: longQuantity,
         stopPrice: longStopLoss,
       });
       console.log('롱 스탑로스 설정 완료:', longStopOrder);
@@ -136,7 +162,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         symbol,
         side: 'SELL',
         type: 'STOP_MARKET',
-        quantity: config.quantity,
+        quantity: longQuantity,
         stopPrice: longStopLoss,
         status: 'pending',
         orderId: longStopOrder.orderId,
@@ -146,16 +172,17 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       // 4. 숏 진입 리밋 주문 생성
       const shortEntry = highChannelEntryPoints.shortEntry;
       const shortStopLoss = shortEntry * (1 + config.stopLossPercent / 100);
+      const shortQuantity = calculateQuantityFromPercentage(shortEntry);
 
-      console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss.toFixed(2)}`);
+      console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss.toFixed(2)}, 수량=${shortQuantity.toFixed(4)}`);
 
-      const shortMetrics = calculateTradingMetrics(shortEntry, shortStopLoss, config.quantity);
+      const shortMetrics = calculateTradingMetrics(shortEntry, shortStopLoss, shortQuantity);
       console.log('숏 포지션 지표:', shortMetrics);
 
       const shortOrder = await BinanceFuturesAPI.createLimitOrder(
         symbol,
         'SELL',
-        config.quantity,
+        shortQuantity,
         shortEntry
       );
       console.log('숏 리밋 주문 생성 완료:', shortOrder);
@@ -165,7 +192,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         symbol,
         side: 'SELL',
         type: 'LIMIT',
-        quantity: config.quantity,
+        quantity: shortQuantity,
         price: shortEntry,
         status: 'pending',
         orderId: shortOrder.orderId,
@@ -177,7 +204,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         symbol,
         side: 'BUY',
         type: 'STOP_MARKET',
-        quantity: config.quantity,
+        quantity: shortQuantity,
         stopPrice: shortStopLoss,
       });
       console.log('숏 스탑로스 설정 완료:', shortStopOrder);
@@ -187,7 +214,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         symbol,
         side: 'BUY',
         type: 'STOP_MARKET',
-        quantity: config.quantity,
+        quantity: shortQuantity,
         stopPrice: shortStopLoss,
         status: 'pending',
         orderId: shortStopOrder.orderId,
