@@ -11,7 +11,7 @@ export const TradingChart = () => {
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const { candlestickData, volumeData, drawings } = useChartStore();
+  const { candlestickData, volumeData, drawings, highChannelEntryPoints } = useChartStore();
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -170,6 +170,41 @@ export const TradingChart = () => {
           }
         }
       });
+
+      // 진입점 마커 그리기
+      if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
+        // 현재 캔들 시간
+        if (candlestickData.length > 0) {
+          const currentTime = candlestickData[candlestickData.length - 1].time;
+
+          // 좌표 변환
+          const currentX = chart.timeScale().timeToCoordinate(currentTime as any);
+          const shortY = series.priceToCoordinate(highChannelEntryPoints.shortEntry);
+          const longY = series.priceToCoordinate(highChannelEntryPoints.longEntry);
+
+          if (currentX !== null && shortY !== null && longY !== null) {
+            const markerSize = 8;
+
+            // 숏 진입점 마커 (아래 방향 삼각형, 빨간색)
+            ctx.fillStyle = '#ef5350';
+            ctx.beginPath();
+            ctx.moveTo(currentX, shortY);
+            ctx.lineTo(currentX - markerSize, shortY - markerSize * 1.5);
+            ctx.lineTo(currentX + markerSize, shortY - markerSize * 1.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // 롱 진입점 마커 (위 방향 삼각형, 초록색)
+            ctx.fillStyle = '#26a69a';
+            ctx.beginPath();
+            ctx.moveTo(currentX, longY);
+            ctx.lineTo(currentX - markerSize, longY + markerSize * 1.5);
+            ctx.lineTo(currentX + markerSize, longY + markerSize * 1.5);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
     };
 
     drawDrawings();
@@ -184,7 +219,7 @@ export const TradingChart = () => {
     return () => {
       chart.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleRangeChange);
     };
-  }, [drawings, candlestickData]);
+  }, [drawings, candlestickData, highChannelEntryPoints]);
 
   return (
     <div className="relative w-full h-full">

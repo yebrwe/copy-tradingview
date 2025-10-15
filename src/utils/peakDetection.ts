@@ -213,3 +213,121 @@ export function findAllTimeLow(candles: CandlestickData[]): Peak | null {
   console.log('최근 15일 최저점:', allTimeLow);
   return allTimeLow;
 }
+
+/**
+ * 1시간봉 기준으로 주요 저점을 찾음
+ * - 최근 6시간(6개 캔들) 중 최저점
+ * - 최근 15일(360개 캔들) 중 최저점
+ * @param candles 캔들스틱 데이터 배열 (1시간봉 기준)
+ * @returns [6시간 최저점, 15일 최저점] 또는 빈 배열
+ */
+export function findMajorLows(candles: CandlestickData[]): Peak[] {
+  const SIX_HOURS = 6; // 6개 캔들
+  const FIFTEEN_DAYS = 15 * 24; // 360개 캔들
+
+  if (candles.length < SIX_HOURS) {
+    console.warn('Not enough data for 6-hour period');
+    return [];
+  }
+
+  // 1. 최근 6시간 중 최저점 찾기
+  let sixHourLow: Peak | null = null;
+  let sixHourMin = Infinity;
+
+  const sixHourStart = Math.max(0, candles.length - SIX_HOURS);
+  for (let i = sixHourStart; i < candles.length; i++) {
+    if (candles[i].low < sixHourMin) {
+      sixHourMin = candles[i].low;
+      sixHourLow = {
+        index: i,
+        time: candles[i].time,
+        price: candles[i].low,
+      };
+    }
+  }
+
+  // 2. 최근 15일 중 최저점 찾기
+  let fifteenDayLow: Peak | null = null;
+  let fifteenDayMin = Infinity;
+
+  const fifteenDayStart = Math.max(0, candles.length - FIFTEEN_DAYS);
+  for (let i = fifteenDayStart; i < candles.length; i++) {
+    if (candles[i].low < fifteenDayMin) {
+      fifteenDayMin = candles[i].low;
+      fifteenDayLow = {
+        index: i,
+        time: candles[i].time,
+        price: candles[i].low,
+      };
+    }
+  }
+
+  console.log('최근 6시간 최저점:', sixHourLow);
+  console.log('최근 15일 최저점:', fifteenDayLow);
+
+  // 두 저점이 같은 지점이면 15일 범위에서 두 번째 저점 찾기
+  if (sixHourLow && fifteenDayLow && sixHourLow.index === fifteenDayLow.index) {
+    console.log('두 저점이 동일하여 15일 범위에서 두 번째 저점을 찾습니다');
+
+    let secondLow: Peak | null = null;
+    let secondMin = Infinity;
+
+    for (let i = fifteenDayStart; i < candles.length; i++) {
+      if (i !== fifteenDayLow.index && candles[i].low < secondMin) {
+        secondMin = candles[i].low;
+        secondLow = {
+          index: i,
+          time: candles[i].time,
+          price: candles[i].low,
+        };
+      }
+    }
+
+    if (secondLow) {
+      console.log('15일 범위 두 번째 저점:', secondLow);
+      return [sixHourLow, secondLow];
+    }
+  }
+
+  if (sixHourLow && fifteenDayLow) {
+    return [sixHourLow, fifteenDayLow];
+  }
+
+  if (sixHourLow) {
+    return [sixHourLow];
+  }
+
+  return [];
+}
+
+/**
+ * 최근 15일 범위에서 최고점 찾기
+ * @param candles 캔들스틱 데이터 배열 (1시간봉 기준)
+ * @returns 최근 15일 최고점
+ */
+export function findAllTimeHigh(candles: CandlestickData[]): Peak | null {
+  const FIFTEEN_DAYS = 15 * 24; // 360개 캔들
+
+  if (candles.length === 0) {
+    return null;
+  }
+
+  let allTimeHigh: Peak | null = null;
+  let maxPrice = -Infinity;
+
+  // 최근 15일 범위에서 최고점 찾기
+  const fifteenDayStart = Math.max(0, candles.length - FIFTEEN_DAYS);
+  for (let i = fifteenDayStart; i < candles.length; i++) {
+    if (candles[i].high > maxPrice) {
+      maxPrice = candles[i].high;
+      allTimeHigh = {
+        index: i,
+        time: candles[i].time,
+        price: candles[i].high,
+      };
+    }
+  }
+
+  console.log('최근 15일 최고점:', allTimeHigh);
+  return allTimeHigh;
+}

@@ -9,7 +9,7 @@ const tools: { id: DrawingTool; label: string; icon: string }[] = [
 ];
 
 export const Toolbar = () => {
-  const { selectedTool, setSelectedTool, clearDrawings, connectMajorPeaks } = useChartStore();
+  const { selectedTool, setSelectedTool, clearDrawings, connectMajorPeaks, connectMajorLows } = useChartStore();
 
   return (
     <div className="flex items-center gap-2 bg-gray-800 p-2 rounded">
@@ -37,7 +37,15 @@ export const Toolbar = () => {
         className="px-3 py-2 rounded text-sm font-medium bg-yellow-600 text-white hover:bg-yellow-700 transition-colors"
         title="최근 6시간과 15일 최고점을 연결하여 채널을 생성합니다"
       >
-        ⚡ 채널 생성 (6h-15d)
+        ⚡ 고점 채널 (6h-15d)
+      </button>
+
+      <button
+        onClick={connectMajorLows}
+        className="px-3 py-2 rounded text-sm font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors"
+        title="최근 6시간과 15일 최저점을 연결하여 채널을 생성합니다"
+      >
+        ⚡ 저점 채널 (6h-15d)
       </button>
 
       <button

@@ -8,7 +8,7 @@ function App() {
   // 바이낸스 데이터 로드
   useBinanceWebSocket();
 
-  const { symbol, timeFrame } = useChartStore();
+  const { symbol, timeFrame, highChannelEntryPoints } = useChartStore();
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
@@ -16,7 +16,7 @@ function App() {
         {/* 헤더 */}
         <div className="mb-4">
           <h1 className="text-3xl font-bold mb-2">트레이딩뷰 차트 복제</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="text-lg">
               <span className="text-gray-400">심볼:</span>{' '}
               <span className="font-semibold text-green-400">{symbol}</span>
@@ -25,6 +25,23 @@ function App() {
               <span className="text-gray-400">타임프레임:</span>{' '}
               <span className="font-semibold text-blue-400">{timeFrame}</span>
             </div>
+            {highChannelEntryPoints.shortEntry !== null && (
+              <>
+                <div className="h-6 w-px bg-gray-600" />
+                <div className="text-lg">
+                  <span className="text-gray-400">숏 진입:</span>{' '}
+                  <span className="font-semibold text-red-400">
+                    ${highChannelEntryPoints.shortEntry.toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-lg">
+                  <span className="text-gray-400">롱 진입:</span>{' '}
+                  <span className="font-semibold text-green-400">
+                    ${highChannelEntryPoints.longEntry?.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

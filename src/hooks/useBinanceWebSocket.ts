@@ -10,6 +10,7 @@ export const useBinanceWebSocket = () => {
     setCandlestickData,
     setVolumeData,
     updateLastCandle,
+    calculateHighChannelEntryPoints,
   } = useChartStore();
 
   const wsServiceRef = useRef<WebSocketService | null>(null);
@@ -42,6 +43,11 @@ export const useBinanceWebSocket = () => {
           if (isMounted) {
             updateLastCandle(candle);
             // 볼륨도 업데이트하려면 스토어에 updateLastVolume 메서드 추가 필요
+
+            // 진입점 재계산
+            setTimeout(() => {
+              calculateHighChannelEntryPoints();
+            }, 0);
           }
         }
       );
@@ -63,7 +69,7 @@ export const useBinanceWebSocket = () => {
         wsServiceRef.current.disconnect();
       }
     };
-  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle]);
+  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints]);
 
   return null;
 };
