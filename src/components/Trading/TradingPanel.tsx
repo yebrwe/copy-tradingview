@@ -352,8 +352,13 @@ export const TradingPanel = () => {
         } catch (error: any) {
           // -2021: Order would immediately trigger 에러는 경고만 표시
           if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
-            console.warn('테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
-            showWarning('테이크프로핏 주문이 스킵되었습니다 (가격 조건 불일치)');
+            console.warn('롱 테이크프로핏 주문 스킵 (가격 조건 불일치):', {
+              진입가: entryPrice,
+              TP가격: takeProfit,
+              현재시장상황: '진입가보다 이미 높음 (즉시 실행될 상태)',
+              에러: error.message
+            });
+            showWarning('롱 테이크프로핏 주문이 스킵되었습니다 (현재가가 이미 TP 조건 도달)');
           } else {
             throw error; // 다른 에러는 상위로 전파
           }
@@ -486,8 +491,13 @@ export const TradingPanel = () => {
         } catch (error: any) {
           // -2021: Order would immediately trigger 에러는 경고만 표시
           if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
-            console.warn('테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
-            showWarning('테이크프로핏 주문이 스킵되었습니다 (가격 조건 불일치)');
+            console.warn('숏 테이크프로핏 주문 스킵 (가격 조건 불일치):', {
+              진입가: entryPrice,
+              TP가격: takeProfit,
+              현재시장상황: '진입가보다 이미 낮음 (즉시 실행될 상태)',
+              에러: error.message
+            });
+            showWarning('숏 테이크프로핏 주문이 스킵되었습니다 (현재가가 이미 TP 조건 도달)');
           } else {
             throw error; // 다른 에러는 상위로 전파
           }
