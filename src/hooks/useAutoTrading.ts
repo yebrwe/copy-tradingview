@@ -28,9 +28,11 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * 자동 거래 Hook
- * 1시간 정각마다 실행되며 다음 작업 수행:
- * 1. 이전 미체결 주문 취소
- * 2. 새로운 진입점에 주문 생성 (스탑로스 포함)
+ * 1시간 캔들 생성 감지 후 10분 대기하여 다음 작업 수행:
+ * 1. 잔고 조회 및 업데이트
+ * 2. 레버리지 설정
+ * 3. 이전 미체결 주문 취소
+ * 4. 새로운 진입점에 리밋 주문 생성 (스탑로스, 테이크프로핏 포함)
  */
 export const useAutoTrading = (config: AutoTradingConfig) => {
   const { symbol, candlestickData, highChannelEntryPoints } = useChartStore();
@@ -401,15 +403,20 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
     // 새로운 캔들 생성 감지 (1시간 정각)
     if (lastCandleTimeRef.current !== null && currentTime > lastCandleTimeRef.current) {
-      console.log('새로운 캔들 감지! 자동 거래 실행...');
+      console.log('새로운 캔들 감지! 10분 후 자동 거래 실행 예약...');
       console.log('이전 시간:', new Date(lastCandleTimeRef.current * 1000).toLocaleString());
       console.log('현재 시간:', new Date(currentTime * 1000).toLocaleString());
 
       lastCandleTimeRef.current = currentTime;
 
-      // 자동 거래 실행
+      // 자동 거래 실행 (10분 지연 - 새로운 캔들이 충분히 형성된 후)
       if (config.enabled) {
-        executeAutoTrading();
+        const delayMinutes = 10;
+        console.log(`${delayMinutes}분 후 자동 거래 실행 예정:`, new Date(Date.now() + delayMinutes * 60 * 1000).toLocaleString());
+        setTimeout(() => {
+          console.log('예약된 자동 거래 실행 시작');
+          executeAutoTrading();
+        }, delayMinutes * 60 * 1000); // 10분 = 600초 = 600000ms
       }
     }
   }, [candlestickData, config, symbol, highChannelEntryPoints]);

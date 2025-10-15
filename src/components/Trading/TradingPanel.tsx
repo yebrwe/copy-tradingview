@@ -757,7 +757,7 @@ export const TradingPanel = () => {
             </div>
             <p className="text-xs text-gray-400">
               {isAutoTradingEnabled
-                ? '✓ 1시간마다 자동으로 롱/숏 진입 주문을 갱신합니다'
+                ? '✓ 1시간마다 자동으로 롱/숏 진입 주문을 갱신합니다 (캔들 생성 후 10분 대기)'
                 : '수동으로 거래를 실행할 수 있습니다'}
             </p>
           </div>
