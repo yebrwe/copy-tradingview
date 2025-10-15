@@ -21,6 +21,10 @@ interface AutoTradingConfig {
 const MAKER_FEE = 0.0002; // 0.02%
 const TAKER_FEE = 0.0004; // 0.04%
 
+// API 호출 간 딜레이 (밀리초)
+const API_CALL_DELAY = 300; // 300ms
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * 자동 거래 Hook
  * 1시간 정각마다 실행되며 다음 작업 수행:
@@ -161,6 +165,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 롱 스탑로스 주문
       if (longStopLoss) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const longStopOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'SELL',
@@ -186,6 +191,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 롱 테이크프로핏 주문
       if (longTakeProfit) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const longTakeProfitOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'SELL',
@@ -210,6 +216,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       }
 
       // 4. 숏 진입 리밋 주문 생성
+      await delay(API_CALL_DELAY); // 롱과 숏 사이 딜레이
       const shortEntry = highChannelEntryPoints.shortEntry;
       const shortStopLoss = config.useStopLoss
         ? shortEntry * (1 + config.stopLossPercent / 100)
@@ -250,6 +257,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 숏 스탑로스 주문
       if (shortStopLoss) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const shortStopOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'BUY',
@@ -275,6 +283,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 숏 테이크프로핏 주문
       if (shortTakeProfit) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const shortTakeProfitOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'BUY',

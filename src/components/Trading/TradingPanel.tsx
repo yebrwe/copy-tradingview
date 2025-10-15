@@ -21,6 +21,10 @@ const STORAGE_KEYS = {
   ACCOUNT_PERCENTAGE: 'trading_account_percentage',
 };
 
+// API 호출 간 딜레이 (밀리초)
+const API_CALL_DELAY = 300; // 300ms
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const TradingPanel = () => {
   const { symbol, highChannelEntryPoints } = useChartStore();
   const { showSuccess, showError, showWarning } = useToastStore();
@@ -286,6 +290,7 @@ export const TradingPanel = () => {
 
       // 스탑로스 주문 생성
       if (stopLoss) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const stopLossOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'SELL',
@@ -311,6 +316,7 @@ export const TradingPanel = () => {
 
       // 테이크프로핏 주문 생성
       if (takeProfit) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const takeProfitOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'SELL',
@@ -398,6 +404,7 @@ export const TradingPanel = () => {
 
       // 스탑로스 주문 생성
       if (stopLoss) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const stopLossOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'BUY',
@@ -423,6 +430,7 @@ export const TradingPanel = () => {
 
       // 테이크프로핏 주문 생성
       if (takeProfit) {
+        await delay(API_CALL_DELAY); // API 호출 간 딜레이
         const takeProfitOrder = await BinanceFuturesAPI.createOrder({
           symbol,
           side: 'BUY',
