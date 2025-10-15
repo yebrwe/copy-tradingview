@@ -39,17 +39,19 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
   const isInitializedRef = useRef(false);
 
   // 비율 기반 수량 계산
-  const calculateQuantityFromPercentage = (currentPrice: number): number => {
-    if (!config.usePercentage || !config.balance) {
+  const calculateQuantityFromPercentage = (currentPrice: number, balance?: number): number => {
+    const balanceToUse = balance || config.balance;
+
+    if (!config.usePercentage || !balanceToUse) {
       return config.quantity;
     }
 
     const percentage = (config.accountPercentage || 10) / 100;
-    const availableMargin = config.balance * percentage;
+    const availableMargin = balanceToUse * percentage;
     const calculatedQty = (availableMargin * config.leverage) / currentPrice;
 
     console.log('비율 기반 수량 계산:', {
-      balance: config.balance,
+      balance: balanceToUse,
       percentage: percentage * 100 + '%',
       availableMargin,
       leverage: config.leverage,
@@ -117,14 +119,30 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
     console.log('시간:', new Date().toLocaleString());
 
     try {
-      // 1. 레버리지 설정
+      // 1. 잔고 조회 (수량 계산에 사용)
+      let currentBalance = config.balance;
+      if (config.usePercentage) {
+        try {
+          console.log('잔고 조회 중...');
+          const balances = await BinanceFuturesAPI.getAccountBalance();
+          const usdtBalance = balances.find((b: any) => b.asset === 'USDT');
+          if (usdtBalance) {
+            currentBalance = parseFloat(usdtBalance.availableBalance);
+            console.log('현재 잔고:', currentBalance, 'USDT');
+          }
+        } catch (error) {
+          console.warn('잔고 조회 실패, 기존 값 사용:', error);
+        }
+      }
+
+      // 2. 레버리지 설정
       await BinanceFuturesAPI.setLeverage(symbol, config.leverage);
 
-      // 2. 이전 미체결 주문 모두 취소
+      // 3. 이전 미체결 주문 모두 취소
       console.log('이전 미체결 주문 취소 중...');
       await BinanceFuturesAPI.cancelAllOpenOrders(symbol);
 
-      // 3. 롱 진입 리밋 주문 생성
+      // 4. 롱 진입 리밋 주문 생성
       const longEntry = highChannelEntryPoints.longEntry;
       const longStopLoss = config.useStopLoss
         ? longEntry * (1 - config.stopLossPercent / 100)
@@ -132,7 +150,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       const longTakeProfit = config.useTakeProfit
         ? longEntry * (1 + config.takeProfitPercent / 100)
         : undefined;
-      const longQuantity = calculateQuantityFromPercentage(longEntry);
+      const longQuantity = calculateQuantityFromPercentage(longEntry, currentBalance);
       const longPairId = `auto_long_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss?.toFixed(2)}, 테이크프로핏=${longTakeProfit?.toFixed(2)}, 수량=${longQuantity.toFixed(4)}`);
@@ -235,7 +253,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         }
       }
 
-      // 4. 숏 진입 리밋 주문 생성
+      // 5. 숏 진입 리밋 주문 생성
       await delay(API_CALL_DELAY); // 롱과 숏 사이 딜레이
       const shortEntry = highChannelEntryPoints.shortEntry;
       const shortStopLoss = config.useStopLoss
@@ -244,7 +262,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       const shortTakeProfit = config.useTakeProfit
         ? shortEntry * (1 - config.takeProfitPercent / 100)
         : undefined;
-      const shortQuantity = calculateQuantityFromPercentage(shortEntry);
+      const shortQuantity = calculateQuantityFromPercentage(shortEntry, currentBalance);
       const shortPairId = `auto_short_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss?.toFixed(2)}, 테이크프로핏=${shortTakeProfit?.toFixed(2)}, 수량=${shortQuantity.toFixed(4)}`);
