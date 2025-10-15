@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useOrderHistoryStore, OrderHistory } from '../../store/orderHistoryStore';
+import { useOrderHistoryStore } from '../../store/orderHistoryStore';
+import type { OrderHistory } from '../../store/orderHistoryStore';
 
 interface OrderPair {
   pairId: string;
