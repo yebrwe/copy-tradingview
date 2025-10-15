@@ -12,7 +12,6 @@ const STORAGE_KEYS = {
   IS_API_CONFIGURED: 'trading_is_api_configured',
   QUANTITY: 'trading_quantity',
   LEVERAGE: 'trading_leverage',
-  STOP_LOSS_PERCENT: 'trading_stop_loss_percent',
   USE_STOP_LOSS: 'trading_use_stop_loss',
   STOP_LOSS_OFFSET: 'trading_stop_loss_offset',
   IS_AUTO_TRADING: 'trading_is_auto_trading',
@@ -33,9 +32,6 @@ export const TradingPanel = () => {
   );
   const [quantity, setQuantity] = useState(() => localStorage.getItem(STORAGE_KEYS.QUANTITY) || '0.01');
   const [leverage, setLeverage] = useState(() => localStorage.getItem(STORAGE_KEYS.LEVERAGE) || '10');
-  const [stopLossPercent, setStopLossPercent] = useState(() =>
-    localStorage.getItem(STORAGE_KEYS.STOP_LOSS_PERCENT) || '5'
-  );
   const [useStopLoss, setUseStopLoss] = useState(() =>
     localStorage.getItem(STORAGE_KEYS.USE_STOP_LOSS) !== 'false'
   );
@@ -83,10 +79,6 @@ export const TradingPanel = () => {
   }, [leverage]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.STOP_LOSS_PERCENT, stopLossPercent);
-  }, [stopLossPercent]);
-
-  useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.USE_STOP_LOSS, String(useStopLoss));
   }, [useStopLoss]);
 
@@ -111,7 +103,7 @@ export const TradingPanel = () => {
     enabled: isAutoTradingEnabled && isApiConfigured,
     leverage: parseInt(leverage),
     quantity: parseFloat(quantity),
-    stopLossPercent: parseFloat(stopLossPercent),
+    stopLossPercent: parseFloat(stopLossOffset),
     usePercentage: usePercentage,
     accountPercentage: parseFloat(accountPercentage),
     balance: balance || undefined,
