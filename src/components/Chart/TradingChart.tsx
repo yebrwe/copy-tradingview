@@ -4,12 +4,15 @@ import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useChartStore } from '../../store/chartStore';
 import type { Drawing } from '../../types/trading.types';
 
+const CHART_RANGE_STORAGE_KEY = 'trading_chart_visible_range';
+
 export const TradingChart = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isRestoringRange = useRef(false);
 
   const { candlestickData, volumeData, drawings, highChannelEntryPoints } = useChartStore();
 
@@ -71,6 +74,18 @@ export const TradingChart = () => {
       },
     });
 
+    // 차트 범위 변경 시 localStorage에 저장
+    const saveVisibleRange = () => {
+      if (isRestoringRange.current) return; // 복원 중에는 저장하지 않음
+
+      const logicalRange = chart.timeScale().getVisibleLogicalRange();
+      if (logicalRange) {
+        localStorage.setItem(CHART_RANGE_STORAGE_KEY, JSON.stringify(logicalRange));
+      }
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(saveVisibleRange);
+
     // 반응형 처리
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
@@ -83,6 +98,7 @@ export const TradingChart = () => {
     window.addEventListener('resize', handleResize);
 
     return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(saveVisibleRange);
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
@@ -92,6 +108,23 @@ export const TradingChart = () => {
   useEffect(() => {
     if (candlestickSeriesRef.current && candlestickData.length > 0) {
       candlestickSeriesRef.current.setData(candlestickData);
+
+      // 데이터 로드 후 저장된 범위 복원
+      if (chartRef.current) {
+        const savedRange = localStorage.getItem(CHART_RANGE_STORAGE_KEY);
+        if (savedRange) {
+          try {
+            const range = JSON.parse(savedRange);
+            isRestoringRange.current = true;
+            chartRef.current.timeScale().setVisibleLogicalRange(range);
+            setTimeout(() => {
+              isRestoringRange.current = false;
+            }, 100);
+          } catch (error) {
+            console.error('Failed to restore chart range:', error);
+          }
+        }
+      }
     }
   }, [candlestickData]);
 
