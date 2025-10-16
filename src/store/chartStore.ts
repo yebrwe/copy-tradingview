@@ -27,6 +27,12 @@ interface ChartState {
   candlestickData: CandlestickData[];
   volumeData: VolumeData[];
 
+  // 백테스팅
+  isBacktesting: boolean;
+  fullCandlestickData: CandlestickData[];
+  fullVolumeData: VolumeData[];
+  backtestingIndex: number; // 현재 보여줄 마지막 캔들의 인덱스
+
   // 설정
   symbol: string;
   timeFrame: TimeFrame;
@@ -61,12 +67,22 @@ interface ChartState {
   calculateLowChannelEntryPoints: () => void;
   classifyChannelPattern: () => void;
   calculateRecommendedEntries: () => void;
+
+  // 백테스팅 액션
+  startBacktesting: () => void;
+  stopBacktesting: () => void;
+  setBacktestingIndex: (index: number) => void;
+  recalculateChannels: () => void;
 }
 
 export const useChartStore = create<ChartState>((set, get) => ({
   // 초기 상태
   candlestickData: [],
   volumeData: [],
+  isBacktesting: false,
+  fullCandlestickData: [],
+  fullVolumeData: [],
+  backtestingIndex: 0,
   symbol: 'ETHUSDT',
   timeFrame: '1h', // 1시간봉으로 기본값 설정
   selectedTool: 'none',
@@ -555,5 +571,93 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     console.log('Recommended entries:', recommended);
     set({ recommendedEntries: recommended });
+  },
+
+  // 백테스팅 액션
+  startBacktesting: () => {
+    const state = get();
+
+    console.log('백테스팅 모드 시작');
+
+    // 현재 데이터를 스냅샷으로 저장
+    set({
+      isBacktesting: true,
+      fullCandlestickData: [...state.candlestickData],
+      fullVolumeData: [...state.volumeData],
+      backtestingIndex: state.candlestickData.length - 1, // 마지막 캔들부터 시작
+    });
+  },
+
+  stopBacktesting: () => {
+    const state = get();
+
+    console.log('백테스팅 모드 종료');
+
+    // 전체 데이터로 복원
+    set({
+      isBacktesting: false,
+      candlestickData: [...state.fullCandlestickData],
+      volumeData: [...state.fullVolumeData],
+      backtestingIndex: 0,
+    });
+
+    // 채널 재계산
+    setTimeout(() => {
+      get().recalculateChannels();
+    }, 100);
+  },
+
+  setBacktestingIndex: (index: number) => {
+    const state = get();
+
+    if (!state.isBacktesting) {
+      console.warn('백테스팅 모드가 아닙니다.');
+      return;
+    }
+
+    // 인덱스 범위 체크
+    const maxIndex = state.fullCandlestickData.length - 1;
+    const clampedIndex = Math.max(50, Math.min(index, maxIndex)); // 최소 50개 캔들은 보여줌
+
+    console.log(`백테스팅 시점 이동: ${clampedIndex + 1} / ${state.fullCandlestickData.length}`);
+
+    // 해당 인덱스까지의 데이터만 표시
+    set({
+      backtestingIndex: clampedIndex,
+      candlestickData: state.fullCandlestickData.slice(0, clampedIndex + 1),
+      volumeData: state.fullVolumeData.slice(0, clampedIndex + 1),
+      drawings: [], // 드로잉 초기화
+    });
+
+    // 채널 재계산
+    setTimeout(() => {
+      get().recalculateChannels();
+    }, 50);
+  },
+
+  recalculateChannels: () => {
+    console.log('채널 재계산 중...');
+
+    const state = get();
+    if (state.candlestickData.length < 50) {
+      console.warn('데이터가 부족합니다.');
+      return;
+    }
+
+    // 기존 자동 채널 드로잉 제거
+    const manualDrawings = state.drawings.filter(d =>
+      !d.id.startsWith('auto-trendline') &&
+      !d.id.startsWith('auto-parallel')
+    );
+
+    set({ drawings: manualDrawings });
+
+    // 고점/저점 채널 자동 생성
+    setTimeout(() => {
+      get().connectMajorPeaks();
+      setTimeout(() => {
+        get().connectMajorLows();
+      }, 100);
+    }, 100);
   },
 }));

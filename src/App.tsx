@@ -4,6 +4,7 @@ import { Toolbar } from './components/Chart/Toolbar';
 import { TradingPanel } from './components/Trading/TradingPanel';
 import { OrderHistoryPanel } from './components/OrderHistory/OrderHistoryPanel';
 import { Toast } from './components/Toast/Toast';
+import { BacktestingPanel } from './components/Backtest/BacktestingPanel';
 import { useBinanceWebSocket } from './hooks/useBinanceWebSocket';
 import { useChartStore } from './store/chartStore';
 
@@ -96,6 +97,9 @@ function App() {
           <Toolbar />
           <TimeframeSelector />
         </div>
+
+        {/* 백테스팅 패널 */}
+        <BacktestingPanel />
 
         {/* 차트 및 거래 영역 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -7,6 +7,7 @@ export const useBinanceWebSocket = () => {
   const {
     symbol,
     timeFrame,
+    isBacktesting,
     setCandlestickData,
     setVolumeData,
     updateLastCandle,
@@ -20,6 +21,12 @@ export const useBinanceWebSocket = () => {
 
   useEffect(() => {
     let isMounted = true;
+
+    // 백테스팅 모드일 때는 데이터 로드 및 WebSocket 연결 스킵
+    if (isBacktesting) {
+      console.log('백테스팅 모드: WebSocket 비활성화');
+      return;
+    }
 
     // 1. 히스토리 데이터 로드
     const loadHistoricalData = async () => {
@@ -82,7 +89,7 @@ export const useBinanceWebSocket = () => {
         wsServiceRef.current.disconnect();
       }
     };
-  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints, calculateLowChannelEntryPoints, connectMajorPeaks, connectMajorLows]);
+  }, [symbol, timeFrame, isBacktesting, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints, calculateLowChannelEntryPoints, connectMajorPeaks, connectMajorLows]);
 
   return null;
 };
