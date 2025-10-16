@@ -60,13 +60,33 @@ export const useUserDataStream = (enabled: boolean): UserDataStreamHook => {
     try {
       console.log('User Data Stream 연결 시작...');
 
-      // listenKey 생성
-      const listenKey = await BinanceFuturesAPI.createListenKey();
-      listenKeyRef.current = listenKey;
-      console.log('Listen Key 생성 완료:', listenKey);
+      // API credentials 설정 대기 (최대 5초)
+      let retries = 0;
+      const maxRetries = 10;
+      while (retries < maxRetries) {
+        try {
+          // listenKey 생성 시도 (API credentials가 설정되어 있어야 성공)
+          const listenKey = await BinanceFuturesAPI.createListenKey();
+          listenKeyRef.current = listenKey;
+          console.log('Listen Key 생성 완료:', listenKey);
+          break; // 성공하면 while 루프 탈출
+        } catch (error: any) {
+          if (error.message?.includes('API credentials not set') && retries < maxRetries - 1) {
+            console.log(`API credentials 대기 중... (${retries + 1}/${maxRetries})`);
+            retries++;
+            await new Promise(resolve => setTimeout(resolve, 500)); // 500ms 대기
+            continue;
+          }
+          throw error; // 다른 에러이거나 최대 재시도 횟수 도달 시 throw
+        }
+      }
+
+      if (!listenKeyRef.current) {
+        throw new Error('Listen Key 생성 실패: API credentials가 설정되지 않았습니다.');
+      }
 
       // WebSocket 연결
-      const ws = new WebSocket(`${BINANCE_WS_BASE_URL}/ws/${listenKey}`);
+      const ws = new WebSocket(`${BINANCE_WS_BASE_URL}/ws/${listenKeyRef.current}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
