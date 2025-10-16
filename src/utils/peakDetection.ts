@@ -108,17 +108,17 @@ export function findMajorPeaks(candles: CandlestickData[]): Peak[] {
   const currentIndex = candles.length - 1;
   const lookback = 5;
 
-  // 1단계: 15일 범위에서 절대 최고점 찾기
+  // 1단계: 15일 범위에서 절대 최고점 찾기 (종가 기준)
   let absoluteHighest: Peak | null = null;
   let maxPrice = -Infinity;
 
   for (let i = fifteenDayStart; i < candles.length; i++) {
-    if (candles[i].high > maxPrice) {
-      maxPrice = candles[i].high;
+    if (candles[i].close > maxPrice) {
+      maxPrice = candles[i].close;
       absoluteHighest = {
         index: i,
         time: candles[i].time,
-        price: candles[i].high,
+        price: candles[i].close,
       };
     }
   }
@@ -130,19 +130,35 @@ export function findMajorPeaks(candles: CandlestickData[]): Peak[] {
 
   console.log('15일 범위 절대 최고점:', absoluteHighest);
 
-  // 2단계: 최고점 이후부터 현재까지 범위에서 모든 고점들 찾기
+  // 2단계: 최고점 이후부터 현재까지 범위에서 확정된 고점들만 찾기 (종가 기준)
   const peaksAfterHighest: Peak[] = [];
   const searchStart = absoluteHighest.index + 1;
 
-  for (let i = searchStart; i < candles.length - lookback; i++) {
-    const currentHigh = candles[i].high;
+  // 현재 캔들(마지막 1개)만 미확정이므로, 현재 캔들 전까지만 검색
+  const searchEnd = candles.length - 1;
+
+  // 15일 최고점 이후부터 현재 캔들 직전까지 검색
+  for (let i = searchStart; i < searchEnd; i++) {
+    const currentClose = candles[i].close;
     let isPeak = true;
 
-    // 좌우 lookback 범위에서 고점인지 확인
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j !== i && j >= 0 && j < candles.length && candles[j].high > currentHigh) {
+    // 좌측 lookback 범위 확인
+    const leftStart = Math.max(0, i - lookback);
+    for (let j = leftStart; j < i; j++) {
+      if (candles[j].close > currentClose) {
         isPeak = false;
         break;
+      }
+    }
+
+    // 우측 lookback 범위 확인 (현재 캔들 전까지의 확정된 데이터로)
+    if (isPeak) {
+      const rightEnd = Math.min(searchEnd - 1, i + lookback);
+      for (let j = i + 1; j <= rightEnd; j++) {
+        if (candles[j].close > currentClose) {
+          isPeak = false;
+          break;
+        }
       }
     }
 
@@ -150,28 +166,7 @@ export function findMajorPeaks(candles: CandlestickData[]): Peak[] {
       peaksAfterHighest.push({
         index: i,
         time: candles[i].time,
-        price: currentHigh,
-      });
-    }
-  }
-
-  // 현재 시점(마지막 캔들)도 고점인지 체크 (우측 확인 없이)
-  if (currentIndex > absoluteHighest.index) {
-    const currentHigh = candles[currentIndex].high;
-    let isCurrentPeak = true;
-
-    for (let j = Math.max(0, currentIndex - lookback); j < currentIndex; j++) {
-      if (candles[j].high > currentHigh) {
-        isCurrentPeak = false;
-        break;
-      }
-    }
-
-    if (isCurrentPeak) {
-      peaksAfterHighest.push({
-        index: currentIndex,
-        time: candles[currentIndex].time,
-        price: currentHigh,
+        price: currentClose,
       });
     }
   }
@@ -183,45 +178,70 @@ export function findMajorPeaks(candles: CandlestickData[]): Peak[] {
 
   console.log('최고점 이후 발견된 고점들:', peaksAfterHighest);
 
-  // 3단계: 최고점 이후의 고점들 중 현재 시점에 가장 가까운 것을 두 번째 고점으로 선택
-  // 단, 최고점과 너무 가까운 것은 제외 (최소 24시간 = 24개 캔들 간격)
+  // 3단계: 재귀적으로 고점 찾기 - 중간점보다 현재 캔들 쪽에 있는 가장 높은 고점 선택
   const minGapFromHighest = 24;
 
+  // 최고점과 최소 간격 이상 떨어진 고점들만 필터링
+  const validPeaks = peaksAfterHighest.filter(peak =>
+    peak.index - absoluteHighest.index >= minGapFromHighest
+  );
+
   let secondPeak: Peak | null = null;
-  let minDistanceFromCurrent = Infinity;
 
-  for (const peak of peaksAfterHighest) {
-    const gapFromHighest = peak.index - absoluteHighest.index;
-    const distanceFromCurrent = currentIndex - peak.index;
+  if (validPeaks.length > 0) {
+    // 중간점 계산: 최고점과 현재 캔들의 중간
+    const midpoint = (absoluteHighest.index + currentIndex) / 2;
 
-    // 최고점과 최소 간격 이상 떨어져 있어야 함
-    if (gapFromHighest >= minGapFromHighest) {
-      if (distanceFromCurrent < minDistanceFromCurrent) {
-        minDistanceFromCurrent = distanceFromCurrent;
+    // 고점들을 가격 순으로 정렬 (높은 것부터)
+    const sortedPeaks = [...validPeaks].sort((a, b) => b.price - a.price);
+
+    // 재귀적으로 탐색: 가장 높은 것부터 확인하되, 중간점보다 현재 캔들 쪽에 있는 것을 찾음
+    for (const peak of sortedPeaks) {
+      if (peak.index > midpoint) {
+        // 중간점보다 현재 캔들 쪽에 있음 → 선택!
         secondPeak = peak;
+        console.log('선택된 두 번째 고점 (중간점 기준, 현재 캔들 쪽):', secondPeak, {
+          price: secondPeak.price,
+          peakIndex: peak.index,
+          midpoint: midpoint,
+          distanceFromHighest: peak.index - absoluteHighest.index,
+          distanceFromCurrent: currentIndex - peak.index,
+          isCloserToCurrent: peak.index > midpoint
+        });
+        break;
       }
     }
-  }
 
-  // 최소 간격 조건을 만족하는 고점이 없으면, 가장 가까운 고점 선택
-  if (!secondPeak && peaksAfterHighest.length > 0) {
-    secondPeak = peaksAfterHighest.reduce((closest, peak) => {
-      const distCurrent = currentIndex - peak.index;
-      const distClosest = currentIndex - closest.index;
-      return distCurrent < distClosest ? peak : closest;
-    });
-    console.warn('최소 간격 조건을 만족하는 고점이 없어 가장 가까운 고점 선택');
+    // 중간점보다 현재 쪽에 있는 고점이 없으면, 가장 높은 고점 선택
+    if (!secondPeak && sortedPeaks.length > 0) {
+      secondPeak = sortedPeaks[0];
+      console.warn('중간점 조건을 만족하는 고점 없음, 가장 높은 고점 선택:', secondPeak);
+    }
+  } else {
+    // 최소 간격 조건을 만족하는 고점이 없으면, 모든 고점 중 탐색
+    console.warn('최소 간격 조건을 만족하는 고점이 없음, 모든 고점 중 선택');
+
+    const midpoint = (absoluteHighest.index + currentIndex) / 2;
+    const sortedPeaks = [...peaksAfterHighest].sort((a, b) => b.price - a.price);
+
+    for (const peak of sortedPeaks) {
+      if (peak.index > midpoint) {
+        secondPeak = peak;
+        console.log('선택된 두 번째 고점 (간격 무시, 중간점 기준):', secondPeak);
+        break;
+      }
+    }
+
+    if (!secondPeak && sortedPeaks.length > 0) {
+      secondPeak = sortedPeaks[0];
+      console.warn('조건 만족하는 고점 없음, 가장 높은 고점 선택');
+    }
   }
 
   if (!secondPeak) {
     console.warn('두 번째 고점을 찾을 수 없음');
     return [absoluteHighest];
   }
-
-  console.log('선택된 두 번째 고점 (현재에 가장 가까움):', secondPeak, {
-    distanceFromCurrent: currentIndex - secondPeak.index,
-    gapFromHighest: secondPeak.index - absoluteHighest.index
-  });
 
   // 시간순으로 정렬하여 반환
   const peaks = [absoluteHighest, secondPeak];
@@ -290,17 +310,17 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
   const currentIndex = candles.length - 1;
   const lookback = 5;
 
-  // 1단계: 15일 범위에서 절대 최저점 찾기
+  // 1단계: 15일 범위에서 절대 최저점 찾기 (종가 기준)
   let absoluteLowest: Peak | null = null;
   let minPrice = Infinity;
 
   for (let i = fifteenDayStart; i < candles.length; i++) {
-    if (candles[i].low < minPrice) {
-      minPrice = candles[i].low;
+    if (candles[i].close < minPrice) {
+      minPrice = candles[i].close;
       absoluteLowest = {
         index: i,
         time: candles[i].time,
-        price: candles[i].low,
+        price: candles[i].close,
       };
     }
   }
@@ -312,19 +332,35 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
 
   console.log('15일 범위 절대 최저점:', absoluteLowest);
 
-  // 2단계: 최저점 이후부터 현재까지 범위에서 모든 저점들 찾기
+  // 2단계: 최저점 이후부터 현재까지 범위에서 확정된 저점들만 찾기 (종가 기준)
   const lowsAfterLowest: Peak[] = [];
   const searchStart = absoluteLowest.index + 1;
 
-  for (let i = searchStart; i < candles.length - lookback; i++) {
-    const currentLowPrice = candles[i].low;
+  // 현재 캔들(마지막 1개)만 미확정이므로, 현재 캔들 전까지만 검색
+  const searchEnd = candles.length - 1;
+
+  // 15일 최저점 이후부터 현재 캔들 직전까지 검색
+  for (let i = searchStart; i < searchEnd; i++) {
+    const currentClose = candles[i].close;
     let isLow = true;
 
-    // 좌우 lookback 범위에서 저점인지 확인
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j !== i && j >= 0 && j < candles.length && candles[j].low < currentLowPrice) {
+    // 좌측 lookback 범위 확인
+    const leftStart = Math.max(0, i - lookback);
+    for (let j = leftStart; j < i; j++) {
+      if (candles[j].close < currentClose) {
         isLow = false;
         break;
+      }
+    }
+
+    // 우측 lookback 범위 확인 (현재 캔들 전까지의 확정된 데이터로)
+    if (isLow) {
+      const rightEnd = Math.min(searchEnd - 1, i + lookback);
+      for (let j = i + 1; j <= rightEnd; j++) {
+        if (candles[j].close < currentClose) {
+          isLow = false;
+          break;
+        }
       }
     }
 
@@ -332,28 +368,7 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
       lowsAfterLowest.push({
         index: i,
         time: candles[i].time,
-        price: currentLowPrice,
-      });
-    }
-  }
-
-  // 현재 시점(마지막 캔들)도 저점인지 체크 (우측 확인 없이)
-  if (currentIndex > absoluteLowest.index) {
-    const currentLowPrice = candles[currentIndex].low;
-    let isCurrentLow = true;
-
-    for (let j = Math.max(0, currentIndex - lookback); j < currentIndex; j++) {
-      if (candles[j].low < currentLowPrice) {
-        isCurrentLow = false;
-        break;
-      }
-    }
-
-    if (isCurrentLow) {
-      lowsAfterLowest.push({
-        index: currentIndex,
-        time: candles[currentIndex].time,
-        price: currentLowPrice,
+        price: currentClose,
       });
     }
   }
@@ -365,45 +380,70 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
 
   console.log('최저점 이후 발견된 저점들:', lowsAfterLowest);
 
-  // 3단계: 최저점 이후의 저점들 중 현재 시점에 가장 가까운 것을 두 번째 저점으로 선택
-  // 단, 최저점과 너무 가까운 것은 제외 (최소 24시간 = 24개 캔들 간격)
+  // 3단계: 재귀적으로 저점 찾기 - 중간점보다 현재 캔들 쪽에 있는 가장 낮은 저점 선택
   const minGapFromLowest = 24;
 
+  // 최저점과 최소 간격 이상 떨어진 저점들만 필터링
+  const validLows = lowsAfterLowest.filter(low =>
+    low.index - absoluteLowest.index >= minGapFromLowest
+  );
+
   let secondLow: Peak | null = null;
-  let minDistanceFromCurrent = Infinity;
 
-  for (const low of lowsAfterLowest) {
-    const gapFromLowest = low.index - absoluteLowest.index;
-    const distanceFromCurrent = currentIndex - low.index;
+  if (validLows.length > 0) {
+    // 중간점 계산: 최저점과 현재 캔들의 중간
+    const midpoint = (absoluteLowest.index + currentIndex) / 2;
 
-    // 최저점과 최소 간격 이상 떨어져 있어야 함
-    if (gapFromLowest >= minGapFromLowest) {
-      if (distanceFromCurrent < minDistanceFromCurrent) {
-        minDistanceFromCurrent = distanceFromCurrent;
+    // 저점들을 가격 순으로 정렬 (낮은 것부터)
+    const sortedLows = [...validLows].sort((a, b) => a.price - b.price);
+
+    // 재귀적으로 탐색: 가장 낮은 것부터 확인하되, 중간점보다 현재 캔들 쪽에 있는 것을 찾음
+    for (const low of sortedLows) {
+      if (low.index > midpoint) {
+        // 중간점보다 현재 캔들 쪽에 있음 → 선택!
         secondLow = low;
+        console.log('선택된 두 번째 저점 (중간점 기준, 현재 캔들 쪽):', secondLow, {
+          price: secondLow.price,
+          lowIndex: low.index,
+          midpoint: midpoint,
+          distanceFromLowest: low.index - absoluteLowest.index,
+          distanceFromCurrent: currentIndex - low.index,
+          isCloserToCurrent: low.index > midpoint
+        });
+        break;
       }
     }
-  }
 
-  // 최소 간격 조건을 만족하는 저점이 없으면, 가장 가까운 저점 선택
-  if (!secondLow && lowsAfterLowest.length > 0) {
-    secondLow = lowsAfterLowest.reduce((closest, low) => {
-      const distCurrent = currentIndex - low.index;
-      const distClosest = currentIndex - closest.index;
-      return distCurrent < distClosest ? low : closest;
-    });
-    console.warn('최소 간격 조건을 만족하는 저점이 없어 가장 가까운 저점 선택');
+    // 중간점보다 현재 쪽에 있는 저점이 없으면, 가장 낮은 저점 선택
+    if (!secondLow && sortedLows.length > 0) {
+      secondLow = sortedLows[0];
+      console.warn('중간점 조건을 만족하는 저점 없음, 가장 낮은 저점 선택:', secondLow);
+    }
+  } else {
+    // 최소 간격 조건을 만족하는 저점이 없으면, 모든 저점 중 탐색
+    console.warn('최소 간격 조건을 만족하는 저점이 없음, 모든 저점 중 선택');
+
+    const midpoint = (absoluteLowest.index + currentIndex) / 2;
+    const sortedLows = [...lowsAfterLowest].sort((a, b) => a.price - b.price);
+
+    for (const low of sortedLows) {
+      if (low.index > midpoint) {
+        secondLow = low;
+        console.log('선택된 두 번째 저점 (간격 무시, 중간점 기준):', secondLow);
+        break;
+      }
+    }
+
+    if (!secondLow && sortedLows.length > 0) {
+      secondLow = sortedLows[0];
+      console.warn('조건 만족하는 저점 없음, 가장 낮은 저점 선택');
+    }
   }
 
   if (!secondLow) {
     console.warn('두 번째 저점을 찾을 수 없음');
     return [absoluteLowest];
   }
-
-  console.log('선택된 두 번째 저점 (현재에 가장 가까움):', secondLow, {
-    distanceFromCurrent: currentIndex - secondLow.index,
-    gapFromLowest: secondLow.index - absoluteLowest.index
-  });
 
   // 시간순으로 정렬하여 반환
   const lows = [absoluteLowest, secondLow];
