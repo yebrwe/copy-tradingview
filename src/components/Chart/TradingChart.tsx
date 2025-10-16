@@ -14,7 +14,7 @@ export const TradingChart = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRestoringRange = useRef(false);
 
-  const { candlestickData, volumeData, drawings, highChannelEntryPoints } = useChartStore();
+  const { candlestickData, volumeData, drawings, highChannelEntryPoints, lowChannelEntryPoints } = useChartStore();
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -204,37 +204,64 @@ export const TradingChart = () => {
         }
       });
 
-      // 진입점 마커 그리기
-      if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
-        // 현재 캔들 시간
-        if (candlestickData.length > 0) {
-          const currentTime = candlestickData[candlestickData.length - 1].time;
+      // 진입점 마커 그리기 (현재 캔들의 X축 위치에서 각 채널과 만나는 지점)
+      if (candlestickData.length > 0) {
+        const currentTime = candlestickData[candlestickData.length - 1].time;
+        const currentX = chart.timeScale().timeToCoordinate(currentTime as any);
 
-          // 좌표 변환
-          const currentX = chart.timeScale().timeToCoordinate(currentTime as any);
-          const shortY = series.priceToCoordinate(highChannelEntryPoints.shortEntry);
-          const longY = series.priceToCoordinate(highChannelEntryPoints.longEntry);
+        if (currentX !== null) {
+          const markerSize = 8;
 
-          if (currentX !== null && shortY !== null && longY !== null) {
-            const markerSize = 8;
+          // 고점 채널 진입점 마커
+          if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
+            const shortY = series.priceToCoordinate(highChannelEntryPoints.shortEntry);
+            const longY = series.priceToCoordinate(highChannelEntryPoints.longEntry);
 
-            // 숏 진입점 마커 (아래 방향 삼각형, 빨간색)
-            ctx.fillStyle = '#ef5350';
-            ctx.beginPath();
-            ctx.moveTo(currentX, shortY);
-            ctx.lineTo(currentX - markerSize, shortY - markerSize * 1.5);
-            ctx.lineTo(currentX + markerSize, shortY - markerSize * 1.5);
-            ctx.closePath();
-            ctx.fill();
+            if (shortY !== null && longY !== null) {
+              // 숏 진입점 마커 (아래 방향 삼각형, 빨간색)
+              ctx.fillStyle = '#ef5350';
+              ctx.beginPath();
+              ctx.moveTo(currentX, shortY);
+              ctx.lineTo(currentX - markerSize, shortY - markerSize * 1.5);
+              ctx.lineTo(currentX + markerSize, shortY - markerSize * 1.5);
+              ctx.closePath();
+              ctx.fill();
 
-            // 롱 진입점 마커 (위 방향 삼각형, 초록색)
-            ctx.fillStyle = '#26a69a';
-            ctx.beginPath();
-            ctx.moveTo(currentX, longY);
-            ctx.lineTo(currentX - markerSize, longY + markerSize * 1.5);
-            ctx.lineTo(currentX + markerSize, longY + markerSize * 1.5);
-            ctx.closePath();
-            ctx.fill();
+              // 롱 진입점 마커 (위 방향 삼각형, 초록색)
+              ctx.fillStyle = '#26a69a';
+              ctx.beginPath();
+              ctx.moveTo(currentX, longY);
+              ctx.lineTo(currentX - markerSize, longY + markerSize * 1.5);
+              ctx.lineTo(currentX + markerSize, longY + markerSize * 1.5);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+
+          // 저점 채널 진입점 마커
+          if (lowChannelEntryPoints.shortEntry !== null && lowChannelEntryPoints.longEntry !== null) {
+            const shortY = series.priceToCoordinate(lowChannelEntryPoints.shortEntry);
+            const longY = series.priceToCoordinate(lowChannelEntryPoints.longEntry);
+
+            if (shortY !== null && longY !== null) {
+              // 숏 진입점 마커 (아래 방향 삼각형, 빨간색)
+              ctx.fillStyle = '#ef5350';
+              ctx.beginPath();
+              ctx.moveTo(currentX, shortY);
+              ctx.lineTo(currentX - markerSize, shortY - markerSize * 1.5);
+              ctx.lineTo(currentX + markerSize, shortY - markerSize * 1.5);
+              ctx.closePath();
+              ctx.fill();
+
+              // 롱 진입점 마커 (위 방향 삼각형, 초록색)
+              ctx.fillStyle = '#26a69a';
+              ctx.beginPath();
+              ctx.moveTo(currentX, longY);
+              ctx.lineTo(currentX - markerSize, longY + markerSize * 1.5);
+              ctx.lineTo(currentX + markerSize, longY + markerSize * 1.5);
+              ctx.closePath();
+              ctx.fill();
+            }
           }
         }
       }
@@ -252,7 +279,7 @@ export const TradingChart = () => {
     return () => {
       chart.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleRangeChange);
     };
-  }, [drawings, candlestickData, highChannelEntryPoints]);
+  }, [drawings, candlestickData, highChannelEntryPoints, lowChannelEntryPoints]);
 
   return (
     <div className="relative w-full h-full">

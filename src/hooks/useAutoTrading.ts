@@ -35,7 +35,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * 4. 새로운 진입점에 리밋 주문 생성 (스탑로스, 테이크프로핏 포함)
  */
 export const useAutoTrading = (config: AutoTradingConfig) => {
-  const { symbol, candlestickData, highChannelEntryPoints } = useChartStore();
+  const { symbol, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelPattern } = useChartStore();
   const { showError, showSuccess } = useToastStore();
   const { addOrder } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
@@ -113,13 +113,48 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       return;
     }
 
-    if (!highChannelEntryPoints.longEntry || !highChannelEntryPoints.shortEntry) {
-      console.log('진입점이 계산되지 않았습니다.');
-      return;
-    }
+    // 패턴에 따라 사용할 진입점 결정
+    let longEntryPoint = highChannelEntryPoints.longEntry;
+    let shortEntryPoint = highChannelEntryPoints.shortEntry;
+    let tradingStrategy = 'both'; // both, long_only, short_only
 
     console.log('=== 자동 거래 시작 ===');
     console.log('시간:', new Date().toLocaleString());
+    console.log('채널 패턴:', channelPattern);
+
+    // 패턴별 전략 적용
+    switch (channelPattern) {
+      case 'ascending':
+        // 상승 채널: 저점 채널 롱 진입 우선
+        if (lowChannelEntryPoints.longEntry) {
+          longEntryPoint = lowChannelEntryPoints.longEntry;
+          console.log('상승 채널 감지 - 저점 채널 롱 진입 사용');
+        }
+        break;
+
+      case 'descending':
+        // 하락 채널: 고점 채널 숏 진입 우선 (기본값 유지)
+        console.log('하락 채널 감지 - 고점 채널 숏 진입 사용');
+        break;
+
+      case 'symmetrical':
+        // 대칭 수렴: 양방향 대기, 작은 수량 권장
+        console.log('대칭 수렴 패턴 감지 - 양방향 진입 (돌파 대기 권장)');
+        break;
+
+      case 'ranging':
+        // 횡보: 양방향 거래
+        console.log('횡보 패턴 감지 - 양방향 거래');
+        break;
+
+      default:
+        console.log('패턴 없음 - 고점 채널 기본 전략 사용');
+    }
+
+    if (!longEntryPoint || !shortEntryPoint) {
+      console.log('진입점이 계산되지 않았습니다.');
+      return;
+    }
 
     try {
       // 1. 잔고 조회 (수량 계산에 사용)
@@ -150,7 +185,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       await BinanceFuturesAPI.cancelAllOpenOrders(symbol);
 
       // 4. 롱 진입 리밋 주문 생성
-      const longEntry = highChannelEntryPoints.longEntry;
+      const longEntry = longEntryPoint!; // 이미 null 체크 완료
       const longStopLoss = config.useStopLoss
         ? longEntry * (1 - config.stopLossPercent / 100)
         : undefined;
@@ -262,7 +297,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       // 5. 숏 진입 리밋 주문 생성
       await delay(API_CALL_DELAY); // 롱과 숏 사이 딜레이
-      const shortEntry = highChannelEntryPoints.shortEntry;
+      const shortEntry = shortEntryPoint!; // 이미 null 체크 완료
       const shortStopLoss = config.useStopLoss
         ? shortEntry * (1 + config.stopLossPercent / 100)
         : undefined;
@@ -419,7 +454,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         }, delayMinutes * 60 * 1000); // 10분 = 600초 = 600000ms
       }
     }
-  }, [candlestickData, config, symbol, highChannelEntryPoints]);
+  }, [candlestickData, config, symbol, highChannelEntryPoints, lowChannelEntryPoints, channelPattern]);
 
   return {
     executeManually: executeAutoTrading,

@@ -13,6 +13,8 @@ interface EntryPoints {
   longEntry: number | null;
 }
 
+type ChannelPattern = 'ascending' | 'descending' | 'symmetrical' | 'ranging' | 'none';
+
 interface ChartState {
   // 차트 데이터
   candlestickData: CandlestickData[];
@@ -28,6 +30,10 @@ interface ChartState {
 
   // 진입점
   highChannelEntryPoints: EntryPoints;
+  lowChannelEntryPoints: EntryPoints;
+
+  // 채널 패턴 분류
+  channelPattern: ChannelPattern;
 
   // 액션
   setCandlestickData: (data: CandlestickData[]) => void;
@@ -42,6 +48,8 @@ interface ChartState {
   connectMajorPeaks: () => void;
   connectMajorLows: () => void;
   calculateHighChannelEntryPoints: () => void;
+  calculateLowChannelEntryPoints: () => void;
+  classifyChannelPattern: () => void;
 }
 
 export const useChartStore = create<ChartState>((set, get) => ({
@@ -56,6 +64,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
     shortEntry: null,
     longEntry: null,
   },
+  lowChannelEntryPoints: {
+    shortEntry: null,
+    longEntry: null,
+  },
+  channelPattern: 'none',
 
   // 액션들
   setCandlestickData: (data) => set({ candlestickData: data }),
@@ -164,9 +177,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
       drawings: [...state.drawings, ...newDrawings],
     };
 
-    // 진입점 계산
+    // 진입점 계산 및 패턴 분류
     setTimeout(() => {
       get().calculateHighChannelEntryPoints();
+      get().classifyChannelPattern();
     }, 0);
 
     return result;
@@ -246,9 +260,17 @@ export const useChartStore = create<ChartState>((set, get) => ({
       newDrawings.push(parallelLine);
     }
 
-    return {
+    const result = {
       drawings: [...state.drawings, ...newDrawings],
     };
+
+    // 진입점 계산 및 패턴 분류
+    setTimeout(() => {
+      get().calculateLowChannelEntryPoints();
+      get().classifyChannelPattern();
+    }, 0);
+
+    return result;
   }),
 
   calculateHighChannelEntryPoints: () => {
@@ -289,7 +311,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const shortEntry = calcPriceAtTime(upperLine, currentTime);
     const longEntry = calcPriceAtTime(lowerLine, currentTime);
 
-    console.log('Entry points calculated:', { shortEntry, longEntry, currentTime });
+    console.log('High channel entry points:', { shortEntry, longEntry, currentTime });
 
     set({
       highChannelEntryPoints: {
@@ -297,5 +319,125 @@ export const useChartStore = create<ChartState>((set, get) => ({
         longEntry,
       }
     });
+  },
+
+  calculateLowChannelEntryPoints: () => {
+    const state = get();
+    const { candlestickData, drawings } = state;
+
+    if (candlestickData.length === 0) {
+      return;
+    }
+
+    // 현재 캔들 시간
+    const currentTime = candlestickData[candlestickData.length - 1].time;
+
+    // 저점 채널 Drawing 찾기
+    const lowerLine = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
+    const upperLine = drawings.find(d => d.id.startsWith('auto-parallel-low-'));
+
+    if (!lowerLine || !upperLine) {
+      // 저점 채널이 없거나 불완전함
+      set({
+        lowChannelEntryPoints: {
+          shortEntry: null,
+          longEntry: null,
+        }
+      });
+      return;
+    }
+
+    // 각 선의 두 점을 사용하여 직선 방정식 구하기
+    const calcPriceAtTime = (line: Drawing, time: number): number => {
+      const p1 = line.points[0];
+      const p2 = line.points[1];
+
+      const slope = (p2.price - p1.price) / (p2.time - p1.time);
+      return p1.price + slope * (time - p1.time);
+    };
+
+    // 저점 채널의 경우:
+    // - 하단선(저점 연결선)에서 롱 진입
+    // - 상단선(평행선)에서 숏 진입
+    const longEntry = calcPriceAtTime(lowerLine, currentTime);
+    const shortEntry = calcPriceAtTime(upperLine, currentTime);
+
+    console.log('Low channel entry points:', { shortEntry, longEntry, currentTime });
+
+    set({
+      lowChannelEntryPoints: {
+        shortEntry,
+        longEntry,
+      }
+    });
+  },
+
+  classifyChannelPattern: () => {
+    const state = get();
+    const { drawings } = state;
+
+    // 고점 채널과 저점 채널 찾기
+    const highUpper = drawings.find(d => d.id.startsWith('auto-trendline-') && !d.id.includes('low'));
+    const highLower = drawings.find(d => d.id.startsWith('auto-parallel-') && !d.id.includes('low'));
+    const lowLower = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
+    const lowUpper = drawings.find(d => d.id.startsWith('auto-parallel-low-'));
+
+    // 채널이 없으면 패턴 없음
+    if (!highUpper || !highLower || !lowLower || !lowUpper) {
+      set({ channelPattern: 'none' });
+      return;
+    }
+
+    // 기울기 계산 함수
+    const calculateSlope = (line: Drawing): number => {
+      const p1 = line.points[0];
+      const p2 = line.points[1];
+      return (p2.price - p1.price) / (p2.time - p1.time);
+    };
+
+    const highChannelSlope = calculateSlope(highUpper);
+    const lowChannelSlope = calculateSlope(lowLower);
+
+    // 기울기 임계값 (가격의 변화율로 판단, 매우 작은 값은 평평한 것으로 간주)
+    const avgPrice = (highUpper.points[0].price + lowLower.points[0].price) / 2;
+    const flatThreshold = avgPrice * 0.0001; // 0.01% 변화율
+
+    const isHighFlat = Math.abs(highChannelSlope) < flatThreshold;
+    const isLowFlat = Math.abs(lowChannelSlope) < flatThreshold;
+    const isHighRising = highChannelSlope > flatThreshold;
+    const isHighFalling = highChannelSlope < -flatThreshold;
+    const isLowRising = lowChannelSlope > flatThreshold;
+    const isLowFalling = lowChannelSlope < -flatThreshold;
+
+    let pattern: ChannelPattern = 'none';
+
+    // 패턴 분류 로직 (리서치 기반)
+    if (isLowRising && (isHighFlat || isHighRising)) {
+      // 저점 상승 + 고점 평평/상승 = Ascending (상승 채널)
+      pattern = 'ascending';
+    } else if (isHighFalling && (isLowFlat || isLowFalling)) {
+      // 고점 하락 + 저점 평평/하락 = Descending (하락 채널)
+      pattern = 'descending';
+    } else if (isHighFalling && isLowRising) {
+      // 고점 하락 + 저점 상승 = Symmetrical (대칭 수렴)
+      pattern = 'symmetrical';
+    } else if (isHighFlat && isLowFlat) {
+      // 고점 평평 + 저점 평평 = Ranging (횡보)
+      pattern = 'ranging';
+    }
+
+    console.log('Channel pattern classified:', {
+      pattern,
+      highChannelSlope,
+      lowChannelSlope,
+      isHighFlat,
+      isLowFlat,
+      isHighRising,
+      isHighFalling,
+      isLowRising,
+      isLowFalling,
+    });
+
+    set({ channelPattern: pattern });
   },
 }));

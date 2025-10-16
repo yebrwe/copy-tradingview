@@ -11,7 +11,9 @@ export const useBinanceWebSocket = () => {
     setVolumeData,
     updateLastCandle,
     calculateHighChannelEntryPoints,
+    calculateLowChannelEntryPoints,
     connectMajorPeaks,
+    connectMajorLows,
   } = useChartStore();
 
   const wsServiceRef = useRef<WebSocketService | null>(null);
@@ -30,9 +32,13 @@ export const useBinanceWebSocket = () => {
           setVolumeData(volumes);
           console.log(`Loaded ${candlesticks.length} candles`);
 
-          // 데이터 로드 후 자동으로 고점 채널 생성
+          // 데이터 로드 후 자동으로 양방향 채널 생성
           setTimeout(() => {
             connectMajorPeaks();
+            // 고점 채널 생성 후 저점 채널도 생성
+            setTimeout(() => {
+              connectMajorLows();
+            }, 200);
           }, 100);
         }
       } catch (error) {
@@ -50,9 +56,10 @@ export const useBinanceWebSocket = () => {
             updateLastCandle(candle);
             // 볼륨도 업데이트하려면 스토어에 updateLastVolume 메서드 추가 필요
 
-            // 진입점 재계산
+            // 양방향 진입점 재계산
             setTimeout(() => {
               calculateHighChannelEntryPoints();
+              calculateLowChannelEntryPoints();
             }, 0);
           }
         }
@@ -75,7 +82,7 @@ export const useBinanceWebSocket = () => {
         wsServiceRef.current.disconnect();
       }
     };
-  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints, connectMajorPeaks]);
+  }, [symbol, timeFrame, setCandlestickData, setVolumeData, updateLastCandle, calculateHighChannelEntryPoints, calculateLowChannelEntryPoints, connectMajorPeaks, connectMajorLows]);
 
   return null;
 };
