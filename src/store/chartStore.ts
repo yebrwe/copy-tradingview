@@ -400,19 +400,20 @@ export const useChartStore = create<ChartState>((set, get) => ({
       return;
     }
 
-    // 기울기 계산 함수
+    // 기울기 계산 함수 (시간당 가격 변화율로 정규화)
     const calculateSlope = (line: Drawing): number => {
       const p1 = line.points[0];
       const p2 = line.points[1];
-      return (p2.price - p1.price) / (p2.time - p1.time);
+      const timeDiffHours = (p2.time - p1.time) / 3600; // 초를 시간으로 변환
+      return (p2.price - p1.price) / timeDiffHours; // 시간당 가격 변화
     };
 
     const highChannelSlope = calculateSlope(highUpper);
     const lowChannelSlope = calculateSlope(lowLower);
 
-    // 기울기 임계값 (가격의 변화율로 판단, 매우 작은 값은 평평한 것으로 간주)
+    // 기울기 임계값 (시간당 가격 변화 기준)
     const avgPrice = (highUpper.points[0].price + lowLower.points[0].price) / 2;
-    const flatThreshold = avgPrice * 0.0001; // 0.01% 변화율
+    const flatThreshold = avgPrice * 0.0001; // 시간당 평균 가격의 0.01% 변화
 
     const isHighFlat = Math.abs(highChannelSlope) < flatThreshold;
     const isLowFlat = Math.abs(lowChannelSlope) < flatThreshold;
