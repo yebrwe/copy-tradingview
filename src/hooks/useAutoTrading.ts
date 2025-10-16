@@ -40,6 +40,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
   const { addOrder } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
   const isInitializedRef = useRef(false);
+  const scheduledTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 비율 기반 수량 계산
   const calculateQuantityFromPercentage = (currentPrice: number, balance?: number): number => {
@@ -312,17 +313,33 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
       lastCandleTimeRef.current = currentTime;
 
+      // 이전 타이머가 있으면 취소
+      if (scheduledTimerRef.current) {
+        console.log('이전 타이머 취소');
+        clearTimeout(scheduledTimerRef.current);
+        scheduledTimerRef.current = null;
+      }
+
       // 자동 거래 실행 (10분 지연 - 새로운 캔들이 충분히 형성된 후)
       if (config.enabled) {
         const delayMinutes = 10;
         console.log(`${delayMinutes}분 후 자동 거래 실행 예정:`, new Date(Date.now() + delayMinutes * 60 * 1000).toLocaleString());
-        setTimeout(() => {
+        scheduledTimerRef.current = setTimeout(() => {
           console.log('예약된 자동 거래 실행 시작');
           executeAutoTrading();
+          scheduledTimerRef.current = null; // 타이머 실행 후 초기화
         }, delayMinutes * 60 * 1000); // 10분 = 600초 = 600000ms
       }
     }
-  }, [candlestickData, config, symbol, recommendedEntries]);
+
+    // cleanup: 컴포넌트 unmount 또는 effect 재실행 시 타이머 정리
+    return () => {
+      if (scheduledTimerRef.current) {
+        clearTimeout(scheduledTimerRef.current);
+        scheduledTimerRef.current = null;
+      }
+    };
+  }, [candlestickData, config.enabled]);
 
   return {
     executeManually: executeAutoTrading,
