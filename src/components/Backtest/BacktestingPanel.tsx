@@ -15,6 +15,8 @@ export const BacktestingPanel = () => {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(1); // 캔들 / 초
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showEntryDetails, setShowEntryDetails] = useState(false);
 
   // 자동 재생
   useEffect(() => {
@@ -83,153 +85,169 @@ export const BacktestingPanel = () => {
 
   if (!isBacktesting) {
     return (
-      <div className="bg-gray-800 rounded-lg p-4 mb-4">
-        <h2 className="text-xl font-semibold mb-3 text-blue-400">📊 백테스팅</h2>
-        <p className="text-gray-300 mb-4">
-          현재 차트를 스냅샷으로 저장하고, 원하는 시점으로 이동하여 당시의 추천 전략을 확인할 수 있습니다.
-        </p>
+      <div className="bg-gray-800 rounded-lg mb-4">
         <button
-          onClick={handleStart}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-700 transition rounded-lg"
         >
-          백테스팅 시작
+          <h2 className="text-xl font-semibold text-blue-400">📊 백테스팅</h2>
+          <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
         </button>
+
+        {isExpanded && (
+          <div className="px-4 pb-4">
+            <p className="text-gray-300 mb-4 text-sm">
+              현재 차트를 스냅샷으로 저장하고, 원하는 시점으로 이동하여 당시의 추천 전략을 확인할 수 있습니다.
+            </p>
+            <button
+              onClick={handleStart}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+            >
+              백테스팅 시작
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 mb-4 border-2 border-blue-500">
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-xl font-semibold text-blue-400">📊 백테스팅 모드</h2>
+    <div className="bg-gray-800 rounded-lg mb-4 border-2 border-blue-500">
+      <div className="flex justify-between items-center p-3 bg-blue-900/30">
+        <h2 className="text-lg font-semibold text-blue-400">📊 백테스팅 모드</h2>
         <button
           onClick={handleStop}
-          className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+          className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded text-sm transition"
         >
           종료
         </button>
       </div>
 
-      {/* 현재 시점 표시 */}
-      <div className="mb-4 p-3 bg-gray-700 rounded-lg">
-        <div className="text-sm text-gray-400 mb-1">현재 시점</div>
-        <div className="text-lg font-semibold text-white">{getCurrentTime()}</div>
-        <div className="text-sm text-gray-400 mt-1">
-          {backtestingIndex + 1} / {fullCandlestickData.length} 캔들
-        </div>
-      </div>
+      <div className="p-4">
+        {/* 현재 시점 및 전략 - 그리드 레이아웃 */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* 현재 시점 */}
+          <div className="p-3 bg-gray-700 rounded-lg">
+            <div className="text-xs text-gray-400 mb-1">현재 시점</div>
+            <div className="text-sm font-semibold text-white">{getCurrentTime()}</div>
+            <div className="text-xs text-gray-400 mt-1">
+              {backtestingIndex + 1} / {fullCandlestickData.length}
+            </div>
+          </div>
 
-      {/* 추천 전략 표시 */}
-      <div className="mb-4 p-3 bg-gray-700 rounded-lg">
-        <div className="text-sm text-gray-400 mb-2">추천 전략</div>
-        <div className={`text-lg font-semibold mb-2 ${
-          channelPattern === 'ascending' ? 'text-green-400' :
-          channelPattern === 'descending' ? 'text-red-400' :
-          'text-gray-500'
-        }`}>
-          {getStrategyDescription()}
+          {/* 추천 전략 */}
+          <div className="p-3 bg-gray-700 rounded-lg">
+            <div className="text-xs text-gray-400 mb-1">추천 전략</div>
+            <div className={`text-sm font-semibold ${
+              channelPattern === 'ascending' ? 'text-green-400' :
+              channelPattern === 'descending' ? 'text-red-400' :
+              'text-gray-500'
+            }`}>
+              {channelPattern === 'ascending' ? '상승 (저점채널)' :
+               channelPattern === 'descending' ? '하락 (고점채널)' : '분석 중'}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {recommendedEntries.length}개 진입점
+            </div>
+          </div>
         </div>
 
-        {/* 추천 진입점 표시 */}
+        {/* 추천 진입점 - 토글 가능 */}
         {recommendedEntries.length > 0 && (
-          <div className="space-y-2 mt-3">
-            {recommendedEntries.map((entry, index) => (
-              <div
-                key={index}
-                className={`p-2 rounded ${
-                  entry.type === 'long' ? 'bg-green-900/30 border border-green-500' : 'bg-red-900/30 border border-red-500'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold">
-                    {entry.type === 'long' ? '🔼 롱' : '🔻 숏'} 진입
-                  </span>
-                  <span className="text-sm text-gray-400">
-                    {entry.channel === 'high' ? '고점채널' : '저점채널'}
-                  </span>
-                </div>
-                <div className="text-xl font-bold mt-1">
-                  ${entry.price.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-400 mt-1">
-                  {entry.priority === 'primary' ? '주 전략' : '보조 전략'}
-                </div>
+          <div className="mb-4">
+            <button
+              onClick={() => setShowEntryDetails(!showEntryDetails)}
+              className="w-full flex justify-between items-center p-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition text-sm"
+            >
+              <span className="text-gray-300">진입점 상세</span>
+              <span className="text-gray-400">{showEntryDetails ? '▼' : '▶'}</span>
+            </button>
+
+            {showEntryDetails && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {recommendedEntries.map((entry, index) => (
+                  <div
+                    key={index}
+                    className={`p-2 rounded text-sm ${
+                      entry.type === 'long' ? 'bg-green-900/30 border border-green-500' : 'bg-red-900/30 border border-red-500'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-xs">
+                        {entry.type === 'long' ? '🔼 롱' : '🔻 숏'}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {entry.priority === 'primary' ? '주' : '보조'}
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold mt-1">
+                      ${entry.price.toFixed(2)}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
-      </div>
 
-      {/* 슬라이더 */}
-      <div className="mb-4">
-        <input
-          type="range"
-          min="50"
-          max={fullCandlestickData.length - 1}
-          value={backtestingIndex}
-          onChange={handleSliderChange}
-          className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
-              ((backtestingIndex - 50) / (fullCandlestickData.length - 51)) * 100
-            }%, #4b5563 ${
-              ((backtestingIndex - 50) / (fullCandlestickData.length - 51)) * 100
-            }%, #4b5563 100%)`,
-          }}
-        />
-      </div>
+        {/* 슬라이더 */}
+        <div className="mb-3">
+          <input
+            type="range"
+            min="50"
+            max={fullCandlestickData.length - 1}
+            value={backtestingIndex}
+            onChange={handleSliderChange}
+            className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
+                ((backtestingIndex - 50) / (fullCandlestickData.length - 51)) * 100
+              }%, #4b5563 ${
+                ((backtestingIndex - 50) / (fullCandlestickData.length - 51)) * 100
+              }%, #4b5563 100%)`,
+            }}
+          />
+        </div>
 
-      {/* 컨트롤 버튼 */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={handleStepBack}
-          disabled={backtestingIndex <= 50}
-          className="flex-1 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition"
-        >
-          ◀ 이전
-        </button>
-        <button
-          onClick={handlePlayPause}
-          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition"
-        >
-          {isPlaying ? '⏸ 일시정지' : '▶ 재생'}
-        </button>
-        <button
-          onClick={handleStepForward}
-          disabled={backtestingIndex >= fullCandlestickData.length - 1}
-          className="flex-1 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition"
-        >
-          다음 ▶
-        </button>
-      </div>
+        {/* 컨트롤 버튼 */}
+        <div className="grid grid-cols-7 gap-2 mb-3">
+          <button
+            onClick={handleStepBack}
+            disabled={backtestingIndex <= 50}
+            className="bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2 rounded text-sm transition"
+          >
+            ◀
+          </button>
+          <button
+            onClick={handlePlayPause}
+            className="col-span-5 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded text-sm transition"
+          >
+            {isPlaying ? '⏸ 일시정지' : '▶ 재생'}
+          </button>
+          <button
+            onClick={handleStepForward}
+            disabled={backtestingIndex >= fullCandlestickData.length - 1}
+            className="bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2 rounded text-sm transition"
+          >
+            ▶
+          </button>
+        </div>
 
-      {/* 재생 속도 조절 */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-400">재생 속도:</span>
-        <button
-          onClick={() => setPlaySpeed(0.5)}
-          className={`px-3 py-1 rounded ${playSpeed === 0.5 ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300'}`}
-        >
-          0.5x
-        </button>
-        <button
-          onClick={() => setPlaySpeed(1)}
-          className={`px-3 py-1 rounded ${playSpeed === 1 ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300'}`}
-        >
-          1x
-        </button>
-        <button
-          onClick={() => setPlaySpeed(2)}
-          className={`px-3 py-1 rounded ${playSpeed === 2 ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300'}`}
-        >
-          2x
-        </button>
-        <button
-          onClick={() => setPlaySpeed(5)}
-          className={`px-3 py-1 rounded ${playSpeed === 5 ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300'}`}
-        >
-          5x
-        </button>
+        {/* 재생 속도 조절 */}
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs text-gray-400">속도:</span>
+          {[0.5, 1, 2, 5].map((speed) => (
+            <button
+              key={speed}
+              onClick={() => setPlaySpeed(speed)}
+              className={`px-2 py-1 rounded text-xs ${
+                playSpeed === speed ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+              } transition`}
+            >
+              {speed}x
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
