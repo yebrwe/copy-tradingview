@@ -13,8 +13,9 @@ export const TradingChart = () => {
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRestoringRange = useRef(false);
+  const animationFrameRef = useRef<number | null>(null);
 
-  const { candlestickData, volumeData, drawings, highChannelEntryPoints, lowChannelEntryPoints } = useChartStore();
+  const { candlestickData, volumeData, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries } = useChartStore();
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -135,7 +136,7 @@ export const TradingChart = () => {
     }
   }, [volumeData]);
 
-  // Drawing 오버레이 그리기
+  // Drawing 오버레이 그리기 (애니메이션 포함)
   useEffect(() => {
     if (!chartRef.current || !candlestickSeriesRef.current || !canvasRef.current) return;
     if (drawings.length === 0) return;
@@ -145,6 +146,8 @@ export const TradingChart = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    let animationTime = 0;
 
     const drawDrawings = () => {
       const chartWidth = chartContainerRef.current?.clientWidth || 0;
@@ -212,6 +215,16 @@ export const TradingChart = () => {
         if (currentX !== null) {
           const markerSize = 8;
 
+          // 추천 진입점 확인 헬퍼 함수
+          const isRecommended = (price: number, type: 'long' | 'short', channel: 'high' | 'low'): boolean => {
+            return recommendedEntries.some(
+              entry => Math.abs(entry.price - price) < 0.01 && entry.type === type && entry.channel === channel
+            );
+          };
+
+          // 깜빡이는 효과를 위한 opacity 계산 (0.3 ~ 1.0 사이에서 변화)
+          const blinkOpacity = 0.5 + Math.abs(Math.sin(animationTime * 0.003)) * 0.5;
+
           // 고점 채널 진입점 마커
           if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
             const shortY = series.priceToCoordinate(highChannelEntryPoints.shortEntry);
@@ -219,6 +232,8 @@ export const TradingChart = () => {
 
             if (shortY !== null && longY !== null) {
               // 숏 진입점 마커 (아래 방향 삼각형, 빨간색)
+              const isShortRecommended = isRecommended(highChannelEntryPoints.shortEntry, 'short', 'high');
+              ctx.globalAlpha = isShortRecommended ? blinkOpacity : 0.4;
               ctx.fillStyle = '#ef5350';
               ctx.beginPath();
               ctx.moveTo(currentX, shortY);
@@ -226,8 +241,11 @@ export const TradingChart = () => {
               ctx.lineTo(currentX + markerSize, shortY - markerSize * 1.5);
               ctx.closePath();
               ctx.fill();
+              ctx.globalAlpha = 1.0;
 
               // 롱 진입점 마커 (위 방향 삼각형, 초록색)
+              const isLongRecommended = isRecommended(highChannelEntryPoints.longEntry, 'long', 'high');
+              ctx.globalAlpha = isLongRecommended ? blinkOpacity : 0.4;
               ctx.fillStyle = '#26a69a';
               ctx.beginPath();
               ctx.moveTo(currentX, longY);
@@ -235,6 +253,7 @@ export const TradingChart = () => {
               ctx.lineTo(currentX + markerSize, longY + markerSize * 1.5);
               ctx.closePath();
               ctx.fill();
+              ctx.globalAlpha = 1.0;
             }
           }
 
@@ -245,6 +264,8 @@ export const TradingChart = () => {
 
             if (shortY !== null && longY !== null) {
               // 숏 진입점 마커 (아래 방향 삼각형, 빨간색)
+              const isShortRecommended = isRecommended(lowChannelEntryPoints.shortEntry, 'short', 'low');
+              ctx.globalAlpha = isShortRecommended ? blinkOpacity : 0.4;
               ctx.fillStyle = '#ef5350';
               ctx.beginPath();
               ctx.moveTo(currentX, shortY);
@@ -252,8 +273,11 @@ export const TradingChart = () => {
               ctx.lineTo(currentX + markerSize, shortY - markerSize * 1.5);
               ctx.closePath();
               ctx.fill();
+              ctx.globalAlpha = 1.0;
 
               // 롱 진입점 마커 (위 방향 삼각형, 초록색)
+              const isLongRecommended = isRecommended(lowChannelEntryPoints.longEntry, 'long', 'low');
+              ctx.globalAlpha = isLongRecommended ? blinkOpacity : 0.4;
               ctx.fillStyle = '#26a69a';
               ctx.beginPath();
               ctx.moveTo(currentX, longY);
@@ -261,13 +285,21 @@ export const TradingChart = () => {
               ctx.lineTo(currentX + markerSize, longY + markerSize * 1.5);
               ctx.closePath();
               ctx.fill();
+              ctx.globalAlpha = 1.0;
             }
           }
         }
       }
     };
 
-    drawDrawings();
+    // 애니메이션 루프
+    const animate = () => {
+      animationTime += 16; // ~60fps
+      drawDrawings();
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
 
     // 차트 스크롤/줌 시 다시 그리기
     const handleVisibleRangeChange = () => {
@@ -278,8 +310,11 @@ export const TradingChart = () => {
 
     return () => {
       chart.timeScale().unsubscribeVisibleTimeRangeChange(handleVisibleRangeChange);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
-  }, [drawings, candlestickData, highChannelEntryPoints, lowChannelEntryPoints]);
+  }, [drawings, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries]);
 
   return (
     <div className="relative w-full h-full">

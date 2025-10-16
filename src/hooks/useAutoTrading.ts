@@ -35,7 +35,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * 4. 새로운 진입점에 리밋 주문 생성 (스탑로스, 테이크프로핏 포함)
  */
 export const useAutoTrading = (config: AutoTradingConfig) => {
-  const { symbol, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelPattern } = useChartStore();
+  const { symbol, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelPattern, recommendedEntries } = useChartStore();
   const { showError, showSuccess } = useToastStore();
   const { addOrder } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
@@ -113,48 +113,15 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       return;
     }
 
-    // 패턴에 따라 사용할 진입점 결정
-    let longEntryPoint = highChannelEntryPoints.longEntry;
-    let shortEntryPoint = highChannelEntryPoints.shortEntry;
-    let tradingStrategy = 'both'; // both, long_only, short_only
+    if (recommendedEntries.length === 0) {
+      console.log('추천 진입점이 없습니다.');
+      return;
+    }
 
     console.log('=== 자동 거래 시작 ===');
     console.log('시간:', new Date().toLocaleString());
     console.log('채널 패턴:', channelPattern);
-
-    // 패턴별 전략 적용
-    switch (channelPattern) {
-      case 'ascending':
-        // 상승 채널: 저점 채널 롱 진입 우선
-        if (lowChannelEntryPoints.longEntry) {
-          longEntryPoint = lowChannelEntryPoints.longEntry;
-          console.log('상승 채널 감지 - 저점 채널 롱 진입 사용');
-        }
-        break;
-
-      case 'descending':
-        // 하락 채널: 고점 채널 숏 진입 우선 (기본값 유지)
-        console.log('하락 채널 감지 - 고점 채널 숏 진입 사용');
-        break;
-
-      case 'symmetrical':
-        // 대칭 수렴: 양방향 대기, 작은 수량 권장
-        console.log('대칭 수렴 패턴 감지 - 양방향 진입 (돌파 대기 권장)');
-        break;
-
-      case 'ranging':
-        // 횡보: 양방향 거래
-        console.log('횡보 패턴 감지 - 양방향 거래');
-        break;
-
-      default:
-        console.log('패턴 없음 - 고점 채널 기본 전략 사용');
-    }
-
-    if (!longEntryPoint || !shortEntryPoint) {
-      console.log('진입점이 계산되지 않았습니다.');
-      return;
-    }
+    console.log('추천 진입점:', recommendedEntries);
 
     try {
       // 1. 잔고 조회 (수량 계산에 사용)
@@ -184,225 +151,126 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       console.log('이전 미체결 주문 취소 중...');
       await BinanceFuturesAPI.cancelAllOpenOrders(symbol);
 
-      // 4. 롱 진입 리밋 주문 생성
-      const longEntry = longEntryPoint!; // 이미 null 체크 완료
-      const longStopLoss = config.useStopLoss
-        ? longEntry * (1 - config.stopLossPercent / 100)
-        : undefined;
-      const longTakeProfit = config.useTakeProfit
-        ? longEntry * (1 + config.takeProfitPercent / 100)
-        : undefined;
-      const longQuantity = calculateQuantityFromPercentage(longEntry, currentBalance);
-      const longPairId = `auto_long_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      // 4. 추천 진입점 기반 주문 생성
+      for (const [index, entry] of recommendedEntries.entries()) {
+        if (index > 0) {
+          await delay(API_CALL_DELAY); // 주문 간 딜레이
+        }
 
-      console.log(`롱 리밋 주문 생성 중: 진입=${longEntry.toFixed(2)}, 스탑로스=${longStopLoss?.toFixed(2)}, 테이크프로핏=${longTakeProfit?.toFixed(2)}, 수량=${longQuantity.toFixed(4)}`);
+        const entryPrice = entry.price;
+        const side = entry.type === 'long' ? 'BUY' : 'SELL';
+        const oppositeSide = entry.type === 'long' ? 'SELL' : 'BUY';
 
-      if (longStopLoss) {
-        const longMetrics = calculateTradingMetrics(longEntry, longStopLoss, longQuantity);
-        console.log('롱 포지션 지표:', longMetrics);
-      }
+        // 스탑로스 & 테이크프로핏 계산
+        const stopLoss = config.useStopLoss
+          ? (entry.type === 'long'
+              ? entryPrice * (1 - config.stopLossPercent / 100)
+              : entryPrice * (1 + config.stopLossPercent / 100))
+          : undefined;
 
-      const longOrder = await BinanceFuturesAPI.createLimitOrder(
-        symbol,
-        'BUY',
-        longQuantity,
-        longEntry
-      );
-      console.log('롱 리밋 주문 생성 완료:', longOrder);
+        const takeProfit = config.useTakeProfit
+          ? (entry.type === 'long'
+              ? entryPrice * (1 + config.takeProfitPercent / 100)
+              : entryPrice * (1 - config.takeProfitPercent / 100))
+          : undefined;
 
-      // 주문 내역 저장
-      addOrder({
-        symbol,
-        side: 'BUY',
-        type: 'LIMIT',
-        quantity: longQuantity,
-        price: longEntry,
-        status: 'pending',
-        orderId: longOrder.orderId,
-        isAutoTrading: true,
-        pairId: longPairId,
-      });
+        const quantity = calculateQuantityFromPercentage(entryPrice, currentBalance);
+        const pairId = `auto_${entry.type}_${entry.channel}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      // 롱 스탑로스 주문
-      if (longStopLoss) {
-        try {
-          await delay(API_CALL_DELAY); // API 호출 간 딜레이
-          const longStopOrder = await BinanceFuturesAPI.createOrder({
-            symbol,
-            side: 'SELL',
-            type: 'STOP_MARKET',
-            quantity: longQuantity,
-            stopPrice: longStopLoss,
-            reduceOnly: true,
-          });
-          console.log('롱 스탑로스 설정 완료:', longStopOrder);
+        console.log(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 리밋 주문 생성 중: 진입=${entryPrice.toFixed(2)}, 스탑로스=${stopLoss?.toFixed(2)}, 테이크프로핏=${takeProfit?.toFixed(2)}, 수량=${quantity.toFixed(4)}`);
 
-          // 스탑로스 주문 내역 저장
-          addOrder({
-            symbol,
-            side: 'SELL',
-            type: 'STOP_MARKET',
-            quantity: longQuantity,
-            stopPrice: longStopLoss,
-            status: 'pending',
-            orderId: longStopOrder.orderId,
-            isAutoTrading: true,
-            pairId: longPairId,
-          });
-        } catch (error: any) {
-          // -2021: Order would immediately trigger 에러는 경고만 로그
-          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
-            console.warn('롱 스탑로스 주문 스킵 (가격 조건 불일치):', error.message);
-          } else {
-            console.error('롱 스탑로스 주문 실패:', error);
+        if (stopLoss) {
+          const metrics = calculateTradingMetrics(entryPrice, stopLoss, quantity);
+          console.log(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 포지션 지표:`, metrics);
+        }
+
+        // 진입 주문 생성
+        const entryOrder = await BinanceFuturesAPI.createLimitOrder(
+          symbol,
+          side as 'BUY' | 'SELL',
+          quantity,
+          entryPrice
+        );
+        console.log(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 리밋 주문 생성 완료:`, entryOrder);
+
+        // 주문 내역 저장
+        addOrder({
+          symbol,
+          side: side as 'BUY' | 'SELL',
+          type: 'LIMIT',
+          quantity,
+          price: entryPrice,
+          status: 'pending',
+          orderId: entryOrder.orderId,
+          isAutoTrading: true,
+          pairId,
+        });
+
+        // 스탑로스 주문
+        if (stopLoss) {
+          try {
+            await delay(API_CALL_DELAY);
+            const stopOrder = await BinanceFuturesAPI.createOrder({
+              symbol,
+              side: oppositeSide as 'BUY' | 'SELL',
+              type: 'STOP_MARKET',
+              quantity,
+              stopPrice: stopLoss,
+              reduceOnly: true,
+            });
+            console.log(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 스탑로스 설정 완료:`, stopOrder);
+
+            addOrder({
+              symbol,
+              side: oppositeSide as 'BUY' | 'SELL',
+              type: 'STOP_MARKET',
+              quantity,
+              stopPrice: stopLoss,
+              status: 'pending',
+              orderId: stopOrder.orderId,
+              isAutoTrading: true,
+              pairId,
+            });
+          } catch (error: any) {
+            if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+              console.warn(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 스탑로스 주문 스킵 (가격 조건 불일치):`, error.message);
+            } else {
+              console.error(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 스탑로스 주문 실패:`, error);
+            }
           }
         }
-      }
 
-      // 롱 테이크프로핏 주문
-      if (longTakeProfit) {
-        try {
-          await delay(API_CALL_DELAY); // API 호출 간 딜레이
-          const longTakeProfitOrder = await BinanceFuturesAPI.createOrder({
-            symbol,
-            side: 'SELL',
-            type: 'TAKE_PROFIT_MARKET',
-            quantity: longQuantity,
-            stopPrice: longTakeProfit,
-            reduceOnly: true,
-          });
-          console.log('롱 테이크프로핏 설정 완료:', longTakeProfitOrder);
+        // 테이크프로핏 주문
+        if (takeProfit) {
+          try {
+            await delay(API_CALL_DELAY);
+            const takeProfitOrder = await BinanceFuturesAPI.createOrder({
+              symbol,
+              side: oppositeSide as 'BUY' | 'SELL',
+              type: 'TAKE_PROFIT_MARKET',
+              quantity,
+              stopPrice: takeProfit,
+              reduceOnly: true,
+            });
+            console.log(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 테이크프로핏 설정 완료:`, takeProfitOrder);
 
-          // 테이크프로핏 주문 내역 저장
-          addOrder({
-            symbol,
-            side: 'SELL',
-            type: 'TAKE_PROFIT_MARKET',
-            quantity: longQuantity,
-            takeProfitPrice: longTakeProfit,
-            status: 'pending',
-            orderId: longTakeProfitOrder.orderId,
-            isAutoTrading: true,
-            pairId: longPairId,
-          });
-        } catch (error: any) {
-          // -2021: Order would immediately trigger 에러는 경고만 로그
-          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
-            console.warn('롱 테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
-          } else {
-            console.error('롱 테이크프로핏 주문 실패:', error);
-          }
-        }
-      }
-
-      // 5. 숏 진입 리밋 주문 생성
-      await delay(API_CALL_DELAY); // 롱과 숏 사이 딜레이
-      const shortEntry = shortEntryPoint!; // 이미 null 체크 완료
-      const shortStopLoss = config.useStopLoss
-        ? shortEntry * (1 + config.stopLossPercent / 100)
-        : undefined;
-      const shortTakeProfit = config.useTakeProfit
-        ? shortEntry * (1 - config.takeProfitPercent / 100)
-        : undefined;
-      const shortQuantity = calculateQuantityFromPercentage(shortEntry, currentBalance);
-      const shortPairId = `auto_short_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-      console.log(`숏 리밋 주문 생성 중: 진입=${shortEntry.toFixed(2)}, 스탑로스=${shortStopLoss?.toFixed(2)}, 테이크프로핏=${shortTakeProfit?.toFixed(2)}, 수량=${shortQuantity.toFixed(4)}`);
-
-      if (shortStopLoss) {
-        const shortMetrics = calculateTradingMetrics(shortEntry, shortStopLoss, shortQuantity);
-        console.log('숏 포지션 지표:', shortMetrics);
-      }
-
-      const shortOrder = await BinanceFuturesAPI.createLimitOrder(
-        symbol,
-        'SELL',
-        shortQuantity,
-        shortEntry
-      );
-      console.log('숏 리밋 주문 생성 완료:', shortOrder);
-
-      // 주문 내역 저장
-      addOrder({
-        symbol,
-        side: 'SELL',
-        type: 'LIMIT',
-        quantity: shortQuantity,
-        price: shortEntry,
-        status: 'pending',
-        orderId: shortOrder.orderId,
-        isAutoTrading: true,
-        pairId: shortPairId,
-      });
-
-      // 숏 스탑로스 주문
-      if (shortStopLoss) {
-        try {
-          await delay(API_CALL_DELAY); // API 호출 간 딜레이
-          const shortStopOrder = await BinanceFuturesAPI.createOrder({
-            symbol,
-            side: 'BUY',
-            type: 'STOP_MARKET',
-            quantity: shortQuantity,
-            stopPrice: shortStopLoss,
-            reduceOnly: true,
-          });
-          console.log('숏 스탑로스 설정 완료:', shortStopOrder);
-
-          // 스탑로스 주문 내역 저장
-          addOrder({
-            symbol,
-            side: 'BUY',
-            type: 'STOP_MARKET',
-            quantity: shortQuantity,
-            stopPrice: shortStopLoss,
-            status: 'pending',
-            orderId: shortStopOrder.orderId,
-            isAutoTrading: true,
-            pairId: shortPairId,
-          });
-        } catch (error: any) {
-          // -2021: Order would immediately trigger 에러는 경고만 로그
-          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
-            console.warn('숏 스탑로스 주문 스킵 (가격 조건 불일치):', error.message);
-          } else {
-            console.error('숏 스탑로스 주문 실패:', error);
-          }
-        }
-      }
-
-      // 숏 테이크프로핏 주문
-      if (shortTakeProfit) {
-        try {
-          await delay(API_CALL_DELAY); // API 호출 간 딜레이
-          const shortTakeProfitOrder = await BinanceFuturesAPI.createOrder({
-            symbol,
-            side: 'BUY',
-            type: 'TAKE_PROFIT_MARKET',
-            quantity: shortQuantity,
-            stopPrice: shortTakeProfit,
-            reduceOnly: true,
-          });
-          console.log('숏 테이크프로핏 설정 완료:', shortTakeProfitOrder);
-
-          // 테이크프로핏 주문 내역 저장
-          addOrder({
-            symbol,
-            side: 'BUY',
-            type: 'TAKE_PROFIT_MARKET',
-            quantity: shortQuantity,
-            takeProfitPrice: shortTakeProfit,
-            status: 'pending',
-            orderId: shortTakeProfitOrder.orderId,
-            isAutoTrading: true,
-            pairId: shortPairId,
-          });
-        } catch (error: any) {
-          // -2021: Order would immediately trigger 에러는 경고만 로그
-          if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
-            console.warn('숏 테이크프로핏 주문 스킵 (가격 조건 불일치):', error.message);
-          } else {
-            console.error('숏 테이크프로핏 주문 실패:', error);
+            addOrder({
+              symbol,
+              side: oppositeSide as 'BUY' | 'SELL',
+              type: 'TAKE_PROFIT_MARKET',
+              quantity,
+              takeProfitPrice: takeProfit,
+              status: 'pending',
+              orderId: takeProfitOrder.orderId,
+              isAutoTrading: true,
+              pairId,
+            });
+          } catch (error: any) {
+            if (error.message?.includes('-2021') || error.message?.includes('immediately trigger')) {
+              console.warn(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 테이크프로핏 주문 스킵 (가격 조건 불일치):`, error.message);
+            } else {
+              console.error(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 테이크프로핏 주문 실패:`, error);
+            }
           }
         }
       }
@@ -454,7 +322,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         }, delayMinutes * 60 * 1000); // 10분 = 600초 = 600000ms
       }
     }
-  }, [candlestickData, config, symbol, highChannelEntryPoints, lowChannelEntryPoints, channelPattern]);
+  }, [candlestickData, config, symbol, recommendedEntries]);
 
   return {
     executeManually: executeAutoTrading,

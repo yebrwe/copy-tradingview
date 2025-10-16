@@ -13,6 +13,13 @@ interface EntryPoints {
   longEntry: number | null;
 }
 
+interface RecommendedEntry {
+  price: number;
+  type: 'long' | 'short';
+  channel: 'high' | 'low';
+  priority: 'primary' | 'secondary';
+}
+
 type ChannelPattern = 'ascending' | 'descending' | 'symmetrical' | 'ranging' | 'none';
 
 interface ChartState {
@@ -35,6 +42,9 @@ interface ChartState {
   // 채널 패턴 분류
   channelPattern: ChannelPattern;
 
+  // 추천 진입점 (확률 높은 2개)
+  recommendedEntries: RecommendedEntry[];
+
   // 액션
   setCandlestickData: (data: CandlestickData[]) => void;
   updateLastCandle: (candle: CandlestickData) => void;
@@ -50,6 +60,7 @@ interface ChartState {
   calculateHighChannelEntryPoints: () => void;
   calculateLowChannelEntryPoints: () => void;
   classifyChannelPattern: () => void;
+  calculateRecommendedEntries: () => void;
 }
 
 export const useChartStore = create<ChartState>((set, get) => ({
@@ -69,6 +80,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     longEntry: null,
   },
   channelPattern: 'none',
+  recommendedEntries: [],
 
   // 액션들
   setCandlestickData: (data) => set({ candlestickData: data }),
@@ -439,5 +451,123 @@ export const useChartStore = create<ChartState>((set, get) => ({
     });
 
     set({ channelPattern: pattern });
+
+    // 패턴 분류 후 추천 진입점 계산
+    setTimeout(() => {
+      get().calculateRecommendedEntries();
+    }, 0);
+  },
+
+  calculateRecommendedEntries: () => {
+    const state = get();
+    const { channelPattern, highChannelEntryPoints, lowChannelEntryPoints } = state;
+
+    const recommended: RecommendedEntry[] = [];
+
+    // 패턴별 추천 전략
+    switch (channelPattern) {
+      case 'ascending':
+        // 상승 채널: 저점채널 롱 (주), 고점채널 롱 (보조)
+        if (lowChannelEntryPoints.longEntry !== null) {
+          recommended.push({
+            price: lowChannelEntryPoints.longEntry,
+            type: 'long',
+            channel: 'low',
+            priority: 'primary',
+          });
+        }
+        if (highChannelEntryPoints.longEntry !== null) {
+          recommended.push({
+            price: highChannelEntryPoints.longEntry,
+            type: 'long',
+            channel: 'high',
+            priority: 'secondary',
+          });
+        }
+        break;
+
+      case 'descending':
+        // 하락 채널: 고점채널 숏 (주), 저점채널 숏 (보조)
+        if (highChannelEntryPoints.shortEntry !== null) {
+          recommended.push({
+            price: highChannelEntryPoints.shortEntry,
+            type: 'short',
+            channel: 'high',
+            priority: 'primary',
+          });
+        }
+        if (lowChannelEntryPoints.shortEntry !== null) {
+          recommended.push({
+            price: lowChannelEntryPoints.shortEntry,
+            type: 'short',
+            channel: 'low',
+            priority: 'secondary',
+          });
+        }
+        break;
+
+      case 'symmetrical':
+        // 대칭 수렴: 돌파 대기 - 고점채널 숏, 저점채널 롱
+        if (highChannelEntryPoints.shortEntry !== null) {
+          recommended.push({
+            price: highChannelEntryPoints.shortEntry,
+            type: 'short',
+            channel: 'high',
+            priority: 'primary',
+          });
+        }
+        if (lowChannelEntryPoints.longEntry !== null) {
+          recommended.push({
+            price: lowChannelEntryPoints.longEntry,
+            type: 'long',
+            channel: 'low',
+            priority: 'primary',
+          });
+        }
+        break;
+
+      case 'ranging':
+        // 횡보: 양방향 거래 - 고점채널 숏, 저점채널 롱
+        if (highChannelEntryPoints.shortEntry !== null) {
+          recommended.push({
+            price: highChannelEntryPoints.shortEntry,
+            type: 'short',
+            channel: 'high',
+            priority: 'primary',
+          });
+        }
+        if (lowChannelEntryPoints.longEntry !== null) {
+          recommended.push({
+            price: lowChannelEntryPoints.longEntry,
+            type: 'long',
+            channel: 'low',
+            priority: 'primary',
+          });
+        }
+        break;
+
+      default:
+        // 패턴 없음: 고점채널 기본 전략
+        if (highChannelEntryPoints.shortEntry !== null) {
+          recommended.push({
+            price: highChannelEntryPoints.shortEntry,
+            type: 'short',
+            channel: 'high',
+            priority: 'primary',
+          });
+        }
+        if (highChannelEntryPoints.longEntry !== null) {
+          recommended.push({
+            price: highChannelEntryPoints.longEntry,
+            type: 'long',
+            channel: 'high',
+            priority: 'secondary',
+          });
+        }
+        break;
+    }
+
+    console.log('Recommended entries:', recommended);
+    set({ recommendedEntries: recommended });
   },
 }));
