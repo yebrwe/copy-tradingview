@@ -15,7 +15,7 @@ export const TradingChart = () => {
   const isRestoringRange = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
 
-  const { candlestickData, volumeData, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries } = useChartStore();
+  const { candlestickData, volumeData, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern } = useChartStore();
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -225,8 +225,8 @@ export const TradingChart = () => {
           // 깜빡이는 효과를 위한 opacity 계산 (0.3 ~ 1.0 사이에서 변화)
           const blinkOpacity = 0.5 + Math.abs(Math.sin(animationTime * 0.003)) * 0.5;
 
-          // 고점 채널 진입점 마커
-          if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
+          // 고점 채널 진입점 마커 (하락 추세일 때만 표시)
+          if (channelPattern === 'descending' && highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
             const shortY = series.priceToCoordinate(highChannelEntryPoints.shortEntry);
             const longY = series.priceToCoordinate(highChannelEntryPoints.longEntry);
 
@@ -257,8 +257,8 @@ export const TradingChart = () => {
             }
           }
 
-          // 저점 채널 진입점 마커
-          if (lowChannelEntryPoints.shortEntry !== null && lowChannelEntryPoints.longEntry !== null) {
+          // 저점 채널 진입점 마커 (상승 추세일 때만 표시)
+          if (channelPattern === 'ascending' && lowChannelEntryPoints.shortEntry !== null && lowChannelEntryPoints.longEntry !== null) {
             const shortY = series.priceToCoordinate(lowChannelEntryPoints.shortEntry);
             const longY = series.priceToCoordinate(lowChannelEntryPoints.longEntry);
 
@@ -314,7 +314,7 @@ export const TradingChart = () => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [drawings, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries]);
+  }, [drawings, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern]);
 
   return (
     <div className="relative w-full h-full">

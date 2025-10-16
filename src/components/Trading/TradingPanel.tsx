@@ -5,6 +5,8 @@ import { useAutoTrading } from '../../hooks/useAutoTrading';
 import { useToastStore } from '../../store/toastStore';
 import { useOrderHistoryStore } from '../../store/orderHistoryStore';
 
+type TabType = 'trading' | 'backtesting';
+
 // localStorage 키
 const STORAGE_KEYS = {
   API_KEY: 'trading_api_key',
@@ -26,9 +28,23 @@ const API_CALL_DELAY = 300; // 300ms
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const TradingPanel = () => {
-  const { symbol, highChannelEntryPoints } = useChartStore();
+  const {
+    symbol,
+    highChannelEntryPoints,
+    isBacktesting,
+    fullCandlestickData,
+    backtestingIndex,
+    startBacktesting,
+    stopBacktesting,
+    setBacktestingIndex,
+    channelPattern,
+    recommendedEntries,
+  } = useChartStore();
   const { showSuccess, showError, showWarning } = useToastStore();
   const { addOrder } = useOrderHistoryStore();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabType>('trading');
 
   // localStorage에서 값 불러오기
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
@@ -68,6 +84,10 @@ export const TradingPanel = () => {
   // 레버리지 관련
   const [currentBinanceLeverage, setCurrentBinanceLeverage] = useState<number | null>(null);
   const [isLoadingLeverage, setIsLoadingLeverage] = useState(false);
+
+  // 백테스팅 관련
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playSpeed, setPlaySpeed] = useState(1); // 캔들 / 초
 
   // localStorage에 값 저장
   useEffect(() => {
@@ -380,6 +400,60 @@ export const TradingPanel = () => {
     }
   };
 
+  // 백테스팅 자동 재생
+  useEffect(() => {
+    if (!isBacktesting || !isPlaying) return;
+
+    const interval = setInterval(() => {
+      if (backtestingIndex >= fullCandlestickData.length - 1) {
+        setIsPlaying(false);
+        return;
+      }
+
+      setBacktestingIndex(backtestingIndex + 1);
+    }, 1000 / playSpeed);
+
+    return () => clearInterval(interval);
+  }, [isBacktesting, isPlaying, backtestingIndex, fullCandlestickData.length, playSpeed, setBacktestingIndex]);
+
+  // 백테스팅 핸들러
+  const handleStartBacktesting = () => {
+    startBacktesting();
+  };
+
+  const handleStopBacktesting = () => {
+    stopBacktesting();
+    setIsPlaying(false);
+  };
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    setBacktestingIndex(value);
+  };
+
+  const handleStepBack = () => {
+    if (backtestingIndex > 50) {
+      setBacktestingIndex(backtestingIndex - 1);
+    }
+  };
+
+  const handleStepForward = () => {
+    if (backtestingIndex < fullCandlestickData.length - 1) {
+      setBacktestingIndex(backtestingIndex + 1);
+    }
+  };
+
+  const handlePlayPause = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  // 현재 시점의 날짜 표시
+  const getCurrentTime = () => {
+    if (!isBacktesting || fullCandlestickData.length === 0) return '';
+    const candle = fullCandlestickData[backtestingIndex];
+    return new Date(candle.time * 1000).toLocaleString();
+  };
+
   // 숏 진입
   const handleShortEntry = async () => {
     if (!isApiConfigured) {
@@ -523,9 +597,34 @@ export const TradingPanel = () => {
 
   return (
     <div className="bg-gray-800 p-4 rounded-lg space-y-4">
-      <h2 className="text-xl font-semibold mb-4">거래 패널</h2>
+      {/* Tab buttons */}
+      <div className="flex gap-2 mb-4 border-b border-gray-700">
+        <button
+          onClick={() => setActiveTab('trading')}
+          className={`px-4 py-2 font-semibold transition-colors ${
+            activeTab === 'trading'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          거래
+        </button>
+        <button
+          onClick={() => setActiveTab('backtesting')}
+          className={`px-4 py-2 font-semibold transition-colors ${
+            activeTab === 'backtesting'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          백테스팅
+        </button>
+      </div>
 
-      {/* API 설정 */}
+      {/* Trading Tab */}
+      {activeTab === 'trading' && (
+        <>
+          {/* API 설정 */}
       {!isApiConfigured ? (
         <div className="space-y-3">
           <div>
@@ -832,6 +931,153 @@ export const TradingPanel = () => {
             API 재설정
           </button>
         </div>
+      )}
+        </>
+      )}
+
+      {/* Backtesting Tab */}
+      {activeTab === 'backtesting' && (
+        <>
+          {!isBacktesting ? (
+            <div className="space-y-3">
+              <p className="text-gray-300 text-sm">
+                현재 차트를 스냅샷으로 저장하고, 원하는 시점으로 이동하여 당시의 추천 전략을 확인할 수 있습니다.
+              </p>
+              <button
+                onClick={handleStartBacktesting}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                백테스팅 시작
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* 헤더 */}
+              <div className="flex justify-between items-center pb-2 border-b border-blue-500">
+                <h3 className="text-lg font-semibold text-blue-400">백테스팅 모드</h3>
+                <button
+                  onClick={handleStopBacktesting}
+                  className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded text-sm transition"
+                >
+                  종료
+                </button>
+              </div>
+
+              {/* 현재 시점 및 전략 */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* 현재 시점 */}
+                <div className="p-2 bg-gray-700 rounded-lg">
+                  <div className="text-xs text-gray-400 mb-1">현재 시점</div>
+                  <div className="text-xs font-semibold text-white">{getCurrentTime()}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {backtestingIndex + 1} / {fullCandlestickData.length}
+                  </div>
+                </div>
+
+                {/* 추천 전략 */}
+                <div className="p-2 bg-gray-700 rounded-lg">
+                  <div className="text-xs text-gray-400 mb-1">추천 전략</div>
+                  <div className={`text-xs font-semibold ${
+                    channelPattern === 'ascending' ? 'text-green-400' :
+                    channelPattern === 'descending' ? 'text-red-400' :
+                    'text-gray-500'
+                  }`}>
+                    {channelPattern === 'ascending' ? '상승 (저점채널)' :
+                     channelPattern === 'descending' ? '하락 (고점채널)' : '분석 중'}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {recommendedEntries.length}개 진입점
+                  </div>
+                </div>
+              </div>
+
+              {/* 추천 진입점 */}
+              {recommendedEntries.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {recommendedEntries.map((entry, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded text-xs ${
+                        entry.type === 'long' ? 'bg-green-900/30 border border-green-500' : 'bg-red-900/30 border border-red-500'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-xs">
+                          {entry.type === 'long' ? '롱' : '숏'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {entry.priority === 'primary' ? '주' : '보조'}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold mt-1">
+                        ${entry.price.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 슬라이더 */}
+              <div>
+                <input
+                  type="range"
+                  min="50"
+                  max={fullCandlestickData.length - 1}
+                  value={backtestingIndex}
+                  onChange={handleSliderChange}
+                  className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
+                      ((backtestingIndex - 50) / (fullCandlestickData.length - 51)) * 100
+                    }%, #4b5563 ${
+                      ((backtestingIndex - 50) / (fullCandlestickData.length - 51)) * 100
+                    }%, #4b5563 100%)`,
+                  }}
+                />
+              </div>
+
+              {/* 컨트롤 버튼 */}
+              <div className="grid grid-cols-7 gap-2">
+                <button
+                  onClick={handleStepBack}
+                  disabled={backtestingIndex <= 50}
+                  className="bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2 rounded text-xs transition"
+                >
+                  ◀
+                </button>
+                <button
+                  onClick={handlePlayPause}
+                  className="col-span-5 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded text-xs transition"
+                >
+                  {isPlaying ? '일시정지' : '재생'}
+                </button>
+                <button
+                  onClick={handleStepForward}
+                  disabled={backtestingIndex >= fullCandlestickData.length - 1}
+                  className="bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2 rounded text-xs transition"
+                >
+                  ▶
+                </button>
+              </div>
+
+              {/* 재생 속도 조절 */}
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-xs text-gray-400">속도:</span>
+                {[0.5, 1, 2, 5].map((speed) => (
+                  <button
+                    key={speed}
+                    onClick={() => setPlaySpeed(speed)}
+                    className={`px-2 py-1 rounded text-xs ${
+                      playSpeed === speed ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                    } transition`}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
