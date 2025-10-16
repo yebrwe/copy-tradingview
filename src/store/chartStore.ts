@@ -184,7 +184,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const isAfterBreakout = channelBreakout !== null;
 
     if (isAfterBreakout) {
-      console.log('🔄 채널 돌파 후 재설정: MA200 터치 지점 기반 채널 생성');
+      console.log('🔄 채널 돌파 후 재설정: ATH + 현재 MA200 기반 채널 생성');
     }
 
     // MA200 계산
@@ -213,7 +213,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
       isPriceAboveMA200,
       isAfterBreakout,
       strategy: isAfterBreakout
-        ? 'MA200 터치 지점 기반'
+        ? 'ATH + 현재 MA200'
         : (isPriceAboveMA200
           ? '최고점 + 최고점 왼쪽(과거) 고점 연결'
           : '기존 알고리즘 (6시간 & 15일 고점)')
@@ -370,8 +370,21 @@ export const useChartStore = create<ChartState>((set, get) => ({
       });
     }
 
+    // 기존 자동 생성된 고점 채널 제거 (저점 채널은 유지)
+    const filteredDrawings = state.drawings.filter(d => {
+      // 고점 채널 추세선 제거 (auto-trendline-로 시작하지만 -low-를 포함하지 않음)
+      if (d.id.startsWith('auto-trendline-') && !d.id.includes('-low-')) {
+        return false;
+      }
+      // 고점 채널 평행선 제거 (auto-parallel-로 시작하지만 -low-를 포함하지 않음)
+      if (d.id.startsWith('auto-parallel-') && !d.id.includes('-low-')) {
+        return false;
+      }
+      return true;
+    });
+
     const result = {
-      drawings: [...state.drawings, ...newDrawings],
+      drawings: [...filteredDrawings, ...newDrawings],
       channelBreakout: null, // 채널 재설정 시 돌파 상태 초기화
     };
 
@@ -451,8 +464,21 @@ export const useChartStore = create<ChartState>((set, get) => ({
       newDrawings.push(parallelLine);
     }
 
+    // 기존 자동 생성된 저점 채널 제거
+    const filteredDrawings = state.drawings.filter(d => {
+      // 저점 채널 추세선 제거
+      if (d.id.startsWith('auto-trendline-low-')) {
+        return false;
+      }
+      // 저점 채널 평행선 제거
+      if (d.id.startsWith('auto-parallel-low-')) {
+        return false;
+      }
+      return true;
+    });
+
     const result = {
-      drawings: [...state.drawings, ...newDrawings],
+      drawings: [...filteredDrawings, ...newDrawings],
     };
 
     // 진입점 계산 및 패턴 분류
