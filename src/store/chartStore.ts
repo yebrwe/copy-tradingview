@@ -766,37 +766,39 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const upperPrice = highChannelEntryPoints.shortEntry;
     const lowerPrice = highChannelEntryPoints.longEntry;
 
-    // 채널 폭 기반 돌파 임계값 계산 (채널 폭의 3%)
-    const channelWidth = upperPrice - lowerPrice;
-    const breakoutThreshold = channelWidth * 0.03; // 3%
+    // 빗각 기준 돌파 임계값 (각 라인 가격의 3%)
+    const upperThreshold = upperPrice * 0.03; // 상단선의 3%
+    const lowerThreshold = lowerPrice * 0.03; // 하단선의 3%
 
     let breakoutStatus: 'upper' | 'lower' | null = null;
 
-    // 상단 채널 돌파 확인 (채널 상단 + 임계값 이상)
-    const upperBreakoutLine = upperPrice + breakoutThreshold;
+    // 상단 채널 돌파 확인 (상단선 + 상단선의 3% 이상)
+    const upperBreakoutLine = upperPrice + upperThreshold;
     if (currentPrice > upperBreakoutLine) {
       breakoutStatus = 'upper';
       console.log('⚠️ 채널 상단 돌파 감지:', {
         currentPrice,
         upperPrice,
         breakoutLine: upperBreakoutLine,
-        threshold: breakoutThreshold,
+        threshold: upperThreshold,
+        thresholdPercent: '3%',
         diff: currentPrice - upperPrice,
-        diffFromBreakoutLine: currentPrice - upperBreakoutLine,
+        diffPercent: ((currentPrice - upperPrice) / upperPrice * 100).toFixed(2) + '%',
       });
     }
-    // 하단 채널 돌파 확인 (채널 하단 - 임계값 이하)
+    // 하단 채널 돌파 확인 (하단선 - 하단선의 3% 이하)
     else {
-      const lowerBreakoutLine = lowerPrice - breakoutThreshold;
+      const lowerBreakoutLine = lowerPrice - lowerThreshold;
       if (currentPrice < lowerBreakoutLine) {
         breakoutStatus = 'lower';
         console.log('⚠️ 채널 하단 돌파 감지:', {
           currentPrice,
           lowerPrice,
           breakoutLine: lowerBreakoutLine,
-          threshold: breakoutThreshold,
+          threshold: lowerThreshold,
+          thresholdPercent: '3%',
           diff: lowerPrice - currentPrice,
-          diffFromBreakoutLine: lowerBreakoutLine - currentPrice,
+          diffPercent: ((lowerPrice - currentPrice) / lowerPrice * 100).toFixed(2) + '%',
         });
       }
     }
