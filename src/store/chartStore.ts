@@ -766,25 +766,39 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const upperPrice = highChannelEntryPoints.shortEntry;
     const lowerPrice = highChannelEntryPoints.longEntry;
 
+    // 채널 폭 기반 돌파 임계값 계산 (채널 폭의 3%)
+    const channelWidth = upperPrice - lowerPrice;
+    const breakoutThreshold = channelWidth * 0.03; // 3%
+
     let breakoutStatus: 'upper' | 'lower' | null = null;
 
-    // 상단 채널 돌파 확인 (현재가가 상단선 위)
-    if (currentPrice > upperPrice) {
+    // 상단 채널 돌파 확인 (채널 상단 + 임계값 이상)
+    const upperBreakoutLine = upperPrice + breakoutThreshold;
+    if (currentPrice > upperBreakoutLine) {
       breakoutStatus = 'upper';
       console.log('⚠️ 채널 상단 돌파 감지:', {
         currentPrice,
         upperPrice,
+        breakoutLine: upperBreakoutLine,
+        threshold: breakoutThreshold,
         diff: currentPrice - upperPrice,
+        diffFromBreakoutLine: currentPrice - upperBreakoutLine,
       });
     }
-    // 하단 채널 돌파 확인 (현재가가 하단선 아래)
-    else if (currentPrice < lowerPrice) {
-      breakoutStatus = 'lower';
-      console.log('⚠️ 채널 하단 돌파 감지:', {
-        currentPrice,
-        lowerPrice,
-        diff: lowerPrice - currentPrice,
-      });
+    // 하단 채널 돌파 확인 (채널 하단 - 임계값 이하)
+    else {
+      const lowerBreakoutLine = lowerPrice - breakoutThreshold;
+      if (currentPrice < lowerBreakoutLine) {
+        breakoutStatus = 'lower';
+        console.log('⚠️ 채널 하단 돌파 감지:', {
+          currentPrice,
+          lowerPrice,
+          breakoutLine: lowerBreakoutLine,
+          threshold: breakoutThreshold,
+          diff: lowerPrice - currentPrice,
+          diffFromBreakoutLine: lowerBreakoutLine - currentPrice,
+        });
+      }
     }
 
     // 돌파 상태가 변경된 경우에만 업데이트
