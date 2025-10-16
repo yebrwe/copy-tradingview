@@ -241,38 +241,31 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     const newDrawings: Drawing[] = [trendline];
 
-    // 고점 채널의 평행이동 거리를 계산
-    const peaks = findMajorPeaks(state.candlestickData);
-    const allTimeLow = findAllTimeLow(state.candlestickData);
+    // 저점 채널의 평행선 생성 (역대 고점까지)
+    const allTimeHigh = findAllTimeHigh(state.candlestickData);
 
-    if (peaks.length >= 2 && allTimeLow && sortedLows.length >= 2) {
-      const sortedPeaks = sortPeaksByTime(peaks);
-      const peak1 = sortedPeaks[0];
-      const peak2 = sortedPeaks[1];
-
-      // 고점 추세선의 기울기
-      const peakSlope = (peak2.price - peak1.price) / (peak2.time - peak1.time);
-
-      // 최저점 시간에서의 고점 선 가격
-      const priceAtLowTime = peak1.price + peakSlope * (allTimeLow.time - peak1.time);
-
-      // 고점 채널의 평행이동 거리 (절대값)
-      const highChannelOffset = Math.abs(allTimeLow.price - priceAtLowTime);
-
-      console.log('High channel offset:', highChannelOffset);
-
-      // 저점 선을 같은 거리만큼 위로 평행이동
+    if (allTimeHigh && sortedLows.length >= 2) {
       const low1 = sortedLows[0];
       const low2 = sortedLows[1];
 
+      // 저점 추세선의 기울기
+      const lowSlope = (low2.price - low1.price) / (low2.time - low1.time);
+
+      // 최고점 시간에서의 저점 선 가격 계산
+      const priceAtHighTime = low1.price + lowSlope * (allTimeHigh.time - low1.time);
+
+      // 평행이동 거리 = 실제 최고점 가격 - 저점 선의 가격
+      const verticalOffset = allTimeHigh.price - priceAtHighTime;
+
+      // 저점 선의 두 점을 수직으로 평행이동
       const parallelPoint1 = {
         time: low1.time,
-        price: low1.price + highChannelOffset,
+        price: low1.price + verticalOffset,
       };
 
       const parallelPoint2 = {
         time: low2.time,
-        price: low2.price + highChannelOffset,
+        price: low2.price + verticalOffset,
       };
 
       const parallelLine: Drawing = {
@@ -283,8 +276,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
         lineWidth: 1,
       };
 
-      console.log('Parallel line created (same offset as high channel):', parallelLine);
-      console.log('Vertical offset:', highChannelOffset);
+      console.log('Parallel line created (vertical translation):', parallelLine);
+      console.log('Vertical offset:', verticalOffset);
       newDrawings.push(parallelLine);
     }
 
