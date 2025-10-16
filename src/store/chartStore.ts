@@ -507,23 +507,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
         break;
 
       case 'symmetrical':
-        // 대칭 수렴: 돌파 대기 - 고점채널 숏, 저점채널 롱
-        if (highChannelEntryPoints.shortEntry !== null) {
-          recommended.push({
-            price: highChannelEntryPoints.shortEntry,
-            type: 'short',
-            channel: 'high',
-            priority: 'primary',
-          });
-        }
-        if (lowChannelEntryPoints.longEntry !== null) {
-          recommended.push({
-            price: lowChannelEntryPoints.longEntry,
-            type: 'long',
-            channel: 'low',
-            priority: 'primary',
-          });
-        }
+        // 대칭 수렴: 돌파 대기 - 진입점 추천하지 않음 (돌파 방향 불확실)
+        // 추천 진입점 없음 (빈 배열)
         break;
 
       case 'ranging':
