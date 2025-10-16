@@ -57,6 +57,9 @@ interface ChartState {
   // 추천 진입점 (확률 높은 2개)
   recommendedEntries: RecommendedEntry[];
 
+  // 채널 돌파 상태 (null: 채널 내부, 'upper': 상단 돌파, 'lower': 하단 돌파)
+  channelBreakout: 'upper' | 'lower' | null;
+
   // 액션
   setCandlestickData: (data: CandlestickData[]) => void;
   updateLastCandle: (candle: CandlestickData) => void;
@@ -73,6 +76,7 @@ interface ChartState {
   calculateLowChannelEntryPoints: () => void;
   classifyChannelPattern: () => void;
   calculateRecommendedEntries: () => void;
+  checkChannelBreakout: () => void;
 
   // 백테스팅 액션
   startBacktesting: () => void;
@@ -129,6 +133,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
   channelPattern: 'none',
   recommendedEntries: [],
+  channelBreakout: null,
 
   // 액션들
   setCandlestickData: (data) => {
@@ -170,7 +175,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     drawings: state.drawings.filter(d => d.id !== id)
   })),
 
-  clearDrawings: () => set({ drawings: [] }),
+  clearDrawings: () => set({ drawings: [], channelBreakout: null }),
 
   connectMajorPeaks: () => set((state) => {
     const { candlestickData } = state;
@@ -336,6 +341,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     const result = {
       drawings: [...state.drawings, ...newDrawings],
+      channelBreakout: null, // 채널 재설정 시 돌파 상태 초기화
     };
 
     // 진입점 계산 및 패턴 분류
@@ -632,6 +638,55 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     console.log('Recommended entries (MA200 based):', recommended);
     set({ recommendedEntries: recommended });
+  },
+
+  checkChannelBreakout: () => {
+    const state = get();
+    const { candlestickData, highChannelEntryPoints } = state;
+
+    if (candlestickData.length === 0) {
+      return;
+    }
+
+    // 고점 채널만 사용하므로 highChannelEntryPoints만 확인
+    if (highChannelEntryPoints.shortEntry === null || highChannelEntryPoints.longEntry === null) {
+      return;
+    }
+
+    const currentPrice = candlestickData[candlestickData.length - 1].close;
+    const upperPrice = highChannelEntryPoints.shortEntry;
+    const lowerPrice = highChannelEntryPoints.longEntry;
+
+    let breakoutStatus: 'upper' | 'lower' | null = null;
+
+    // 상단 채널 돌파 확인 (현재가가 상단선 위)
+    if (currentPrice > upperPrice) {
+      breakoutStatus = 'upper';
+      console.log('⚠️ 채널 상단 돌파 감지:', {
+        currentPrice,
+        upperPrice,
+        diff: currentPrice - upperPrice,
+      });
+    }
+    // 하단 채널 돌파 확인 (현재가가 하단선 아래)
+    else if (currentPrice < lowerPrice) {
+      breakoutStatus = 'lower';
+      console.log('⚠️ 채널 하단 돌파 감지:', {
+        currentPrice,
+        lowerPrice,
+        diff: lowerPrice - currentPrice,
+      });
+    }
+
+    // 돌파 상태가 변경된 경우에만 업데이트
+    if (breakoutStatus !== state.channelBreakout) {
+      set({ channelBreakout: breakoutStatus });
+      if (breakoutStatus) {
+        console.log('🚫 채널 돌파로 인해 자동 거래 중지 (채널 재설정 필요)');
+      } else {
+        console.log('✅ 채널 내부로 복귀');
+      }
+    }
   },
 
   // 백테스팅 액션

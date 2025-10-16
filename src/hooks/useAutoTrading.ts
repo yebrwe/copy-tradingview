@@ -35,7 +35,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * 4. 새로운 진입점에 리밋 주문 생성 (스탑로스, 테이크프로핏 포함)
  */
 export const useAutoTrading = (config: AutoTradingConfig) => {
-  const { symbol, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelPattern, recommendedEntries } = useChartStore();
+  const { symbol, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelPattern, recommendedEntries, channelBreakout, checkChannelBreakout } = useChartStore();
   const { showError, showSuccess } = useToastStore();
   const { addOrder } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
@@ -111,6 +111,14 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
   const executeAutoTrading = async () => {
     if (!config.enabled) {
       console.log('자동 거래가 비활성화되어 있습니다.');
+      return;
+    }
+
+    // 채널 돌파 상태 확인
+    if (channelBreakout !== null) {
+      console.log('🚫 채널 돌파 상태로 인해 자동 거래 중지:', channelBreakout === 'upper' ? '상단 돌파' : '하단 돌파');
+      console.log('💡 채널을 재설정(고점 연결 버튼)하여 돌파 상태를 초기화하세요.');
+      showError('채널이 돌파되어 자동 거래가 중지되었습니다. 채널을 재설정하세요.', '자동 거래');
       return;
     }
 
@@ -289,6 +297,9 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
     const currentCandle = candlestickData[candlestickData.length - 1];
     const currentTime = currentCandle.time;
+
+    // 채널 돌파 상태 확인 (매 캔들 업데이트마다)
+    checkChannelBreakout();
 
     // 초기화 시 (첫 로드)
     if (!isInitializedRef.current) {
