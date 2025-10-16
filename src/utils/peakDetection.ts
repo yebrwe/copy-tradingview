@@ -259,13 +259,11 @@ export function sortPeaksByTime(peaks: Peak[]): Peak[] {
 }
 
 /**
- * 최근 15일 범위에서 최저점 찾기
+ * 전체 데이터에서 역대 최저점 찾기
  * @param candles 캔들스틱 데이터 배열 (1시간봉 기준)
- * @returns 최근 15일 최저점
+ * @returns 역대 최저점
  */
 export function findAllTimeLow(candles: CandlestickData[]): Peak | null {
-  const FIFTEEN_DAYS = 15 * 24; // 360개 캔들
-
   if (candles.length === 0) {
     return null;
   }
@@ -273,9 +271,8 @@ export function findAllTimeLow(candles: CandlestickData[]): Peak | null {
   let allTimeLow: Peak | null = null;
   let minPrice = Infinity;
 
-  // 최근 15일 범위에서 최저점 찾기
-  const fifteenDayStart = Math.max(0, candles.length - FIFTEEN_DAYS);
-  for (let i = fifteenDayStart; i < candles.length; i++) {
+  // 전체 데이터에서 최저점 찾기
+  for (let i = 0; i < candles.length; i++) {
     if (candles[i].low < minPrice) {
       minPrice = candles[i].low;
       allTimeLow = {
@@ -286,7 +283,7 @@ export function findAllTimeLow(candles: CandlestickData[]): Peak | null {
     }
   }
 
-  console.log('최근 15일 최저점:', allTimeLow);
+  console.log('역대 최저점:', allTimeLow);
   return allTimeLow;
 }
 
@@ -454,13 +451,11 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
 }
 
 /**
- * 최근 15일 범위에서 최고점 찾기
+ * 전체 데이터에서 역대 최고점 찾기
  * @param candles 캔들스틱 데이터 배열 (1시간봉 기준)
- * @returns 최근 15일 최고점
+ * @returns 역대 최고점
  */
 export function findAllTimeHigh(candles: CandlestickData[]): Peak | null {
-  const FIFTEEN_DAYS = 15 * 24; // 360개 캔들
-
   if (candles.length === 0) {
     return null;
   }
@@ -468,9 +463,8 @@ export function findAllTimeHigh(candles: CandlestickData[]): Peak | null {
   let allTimeHigh: Peak | null = null;
   let maxPrice = -Infinity;
 
-  // 최근 15일 범위에서 최고점 찾기
-  const fifteenDayStart = Math.max(0, candles.length - FIFTEEN_DAYS);
-  for (let i = fifteenDayStart; i < candles.length; i++) {
+  // 전체 데이터에서 최고점 찾기
+  for (let i = 0; i < candles.length; i++) {
     if (candles[i].high > maxPrice) {
       maxPrice = candles[i].high;
       allTimeHigh = {
@@ -481,6 +475,6 @@ export function findAllTimeHigh(candles: CandlestickData[]): Peak | null {
     }
   }
 
-  console.log('최근 15일 최고점:', allTimeHigh);
+  console.log('역대 최고점:', allTimeHigh);
   return allTimeHigh;
 }
