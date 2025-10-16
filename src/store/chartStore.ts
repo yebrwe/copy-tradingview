@@ -276,23 +276,34 @@ export const useChartStore = create<ChartState>((set, get) => ({
     // 역대 저점 찾기
     const allTimeLow = findAllTimeLow(state.candlestickData);
 
+    console.log('All-time low found:', allTimeLow);
+    console.log('Sorted peaks for parallel translation:', sortedPeaks);
+
     const newDrawings: Drawing[] = [trendline];
 
-    // 평행선 생성 (금색 선을 최저점으로 평행이동)
+    // 평행선 생성 (상단 추세선을 최저점까지 평행이동)
     if (allTimeLow && sortedPeaks.length >= 2) {
       const peak1 = sortedPeaks[0];
       const peak2 = sortedPeaks[1];
 
+      console.log('Creating parallel line...');
+      console.log('Peak 1:', peak1);
+      console.log('Peak 2:', peak2);
+      console.log('All-time low:', allTimeLow);
+
       // 고점 추세선의 기울기 계산
       const priceSlope = (peak2.price - peak1.price) / (peak2.time - peak1.time);
+      console.log('Price slope:', priceSlope);
 
-      // 최저점 시간에서의 금색 선 가격 계산
+      // 최저점 시간에서의 추세선 가격 계산
       const priceAtLowTime = peak1.price + priceSlope * (allTimeLow.time - peak1.time);
+      console.log('Price at low time (if extended):', priceAtLowTime);
 
-      // 평행이동 거리 = 실제 최저점 가격 - 금색 선의 가격
+      // 평행이동 거리 = 실제 최저점 가격 - 추세선의 가격
       const verticalOffset = allTimeLow.price - priceAtLowTime;
+      console.log('Vertical offset for parallel translation:', verticalOffset);
 
-      // 금색 선의 두 점을 수직으로 평행이동
+      // 추세선의 두 점을 수직으로 평행이동
       const parallelPoint1 = {
         time: peak1.time,
         price: peak1.price + verticalOffset,
@@ -311,9 +322,16 @@ export const useChartStore = create<ChartState>((set, get) => ({
         lineWidth: 1,
       };
 
-      console.log('Parallel line created (vertical translation):', parallelLine);
-      console.log('Vertical offset:', verticalOffset);
+      console.log('✓ Parallel line created (translated to all-time low):', parallelLine);
+      console.log('  Point 1:', parallelPoint1);
+      console.log('  Point 2:', parallelPoint2);
+
       newDrawings.push(parallelLine);
+    } else {
+      console.warn('Cannot create parallel line:', {
+        hasAllTimeLow: !!allTimeLow,
+        peaksLength: sortedPeaks.length
+      });
     }
 
     const result = {
@@ -544,22 +562,17 @@ export const useChartStore = create<ChartState>((set, get) => ({
     // 현재 가격
     const currentPrice = candlestickData[candlestickData.length - 1].close;
 
-    // 이평선 기준 추세 판단
-    let pattern: ChannelPattern = 'none';
-
-    if (currentPrice > ma200) {
-      // 현재 가격이 이평선 위 → 상승 추세 → 저점 채널 사용
-      pattern = 'ascending';
-    } else {
-      // 현재 가격이 이평선 아래 → 하락 추세 → 고점 채널 사용
-      pattern = 'descending';
-    }
+    // 고점 채널만 사용 (이평선 위/아래 관계없이)
+    // - 이평선 위: ATH + 왼쪽 고점 연결
+    // - 이평선 아래: 기존 알고리즘 (15일 고점)
+    const pattern: ChannelPattern = 'descending';
 
     console.log('Channel pattern classified (MA200 based):', {
       pattern,
       currentPrice,
       ma200,
       priceAboveMA: currentPrice > ma200,
+      strategy: currentPrice > ma200 ? 'ATH + 왼쪽 고점' : '기존 알고리즘',
     });
 
     set({
@@ -733,16 +746,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
         pattern: currentPrice > ma200 ? 'ascending' : 'descending'
       });
 
-      // 패턴에 따라 해당 채널만 생성
-      if (currentPrice > ma200) {
-        // 상승 추세 → 저점 채널만 생성
-        console.log('백테스팅: 상승 추세 감지, 저점 채널만 생성');
-        get().connectMajorLows();
-      } else {
-        // 하락 추세 → 고점 채널만 생성
-        console.log('백테스팅: 하락 추세 감지, 고점 채널만 생성');
-        get().connectMajorPeaks();
-      }
+      // 이평선 위/아래 관계없이 항상 고점 채널 생성
+      // - 이평선 위: ATH + 왼쪽 고점 연결 → 최저점 평행이동
+      // - 이평선 아래: 기존 알고리즘 (15일 고점 연결)
+      console.log('백테스팅: 고점 채널 생성 (이평선:', currentPrice > ma200 ? '위' : '아래', ')');
+      get().connectMajorPeaks();
     }, 100);
   },
 }));
