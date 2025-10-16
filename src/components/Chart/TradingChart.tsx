@@ -10,12 +10,11 @@ export const TradingChart = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRestoringRange = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
 
-  const { candlestickData, volumeData, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern } = useChartStore();
+  const { candlestickData, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern } = useChartStore();
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -57,23 +56,6 @@ export const TradingChart = () => {
     });
 
     candlestickSeriesRef.current = candlestickSeries;
-
-    // 볼륨 시리즈 추가
-    const volumeSeries = chart.addHistogramSeries({
-      color: '#26a69a',
-      priceFormat: {
-        type: 'volume',
-      },
-      priceScaleId: '',
-    });
-
-    volumeSeriesRef.current = volumeSeries;
-    volumeSeries.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0,
-      },
-    });
 
     // 차트 범위 변경 시 localStorage에 저장
     const saveVisibleRange = () => {
@@ -128,13 +110,6 @@ export const TradingChart = () => {
       }
     }
   }, [candlestickData]);
-
-  // 볼륨 데이터 업데이트
-  useEffect(() => {
-    if (volumeSeriesRef.current && volumeData.length > 0) {
-      volumeSeriesRef.current.setData(volumeData);
-    }
-  }, [volumeData]);
 
   // Drawing 오버레이 그리기 (애니메이션 포함)
   useEffect(() => {

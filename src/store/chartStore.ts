@@ -397,11 +397,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const state = get();
     const { candlestickData, drawings } = state;
 
-    // 채널이 없으면 패턴 없음
+    // 채널 확인
     const highUpper = drawings.find(d => d.id.startsWith('auto-trendline-') && !d.id.includes('low'));
     const lowLower = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
 
-    if (!highUpper || !lowLower || candlestickData.length < 200) {
+    // 채널이 하나도 없거나 데이터가 부족하면 패턴 없음
+    if ((!highUpper && !lowLower) || candlestickData.length < 200) {
       set({ channelPattern: 'none' });
       return;
     }
@@ -446,30 +447,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
       priceAboveMA: currentPrice > ma200,
     });
 
-    // 조건에 맞는 채널만 표시
-    let filteredDrawings = drawings;
-
-    if (pattern === 'ascending') {
-      // 상승 추세 → 저점 채널만 표시 (고점 채널 제거)
-      filteredDrawings = drawings.filter(d =>
-        !d.id.startsWith('auto-trendline-') || d.id.includes('low')
-      ).filter(d =>
-        !d.id.startsWith('auto-parallel-') || d.id.includes('low')
-      );
-      console.log('저점 채널만 표시 (상승 추세)');
-    } else if (pattern === 'descending') {
-      // 하락 추세 → 고점 채널만 표시 (저점 채널 제거)
-      filteredDrawings = drawings.filter(d =>
-        !d.id.startsWith('auto-trendline-low-')
-      ).filter(d =>
-        !d.id.startsWith('auto-parallel-low-')
-      );
-      console.log('고점 채널만 표시 (하락 추세)');
-    }
-
     set({
-      channelPattern: pattern,
-      drawings: filteredDrawings
+      channelPattern: pattern
     });
 
     // 패턴 분류 후 추천 진입점 계산
