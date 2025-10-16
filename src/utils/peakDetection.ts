@@ -478,3 +478,80 @@ export function findAllTimeHigh(candles: CandlestickData[]): Peak | null {
   console.log('역대 최고점:', allTimeHigh);
   return allTimeHigh;
 }
+
+/**
+ * MA200 터치 지점에서 고점 찾기 (돌파 후 재설정용)
+ * @param candles 캔들스틱 데이터 배열
+ * @param ma200Values MA200 값 배열 (시간순)
+ * @returns 시간순으로 정렬된 고점 2개
+ */
+export function findPeaksNearMA200(
+  candles: CandlestickData[],
+  ma200Values: Array<{ time: number; value: number }>
+): Peak[] {
+  if (candles.length < 200 || ma200Values.length === 0) {
+    console.warn('MA200 터치 지점 탐색을 위한 데이터 부족');
+    return [];
+  }
+
+  // MA200 터치 허용 범위 (±2% 이내)
+  const TOUCH_THRESHOLD = 0.02;
+
+  // MA200 근처의 고점들 찾기
+  const touchPeaks: Peak[] = [];
+
+  // MA200 값이 있는 범위에서만 검색
+  const startIndex = Math.max(0, candles.length - ma200Values.length);
+
+  for (let i = startIndex; i < candles.length; i++) {
+    const candle = candles[i];
+
+    // 해당 시간의 MA200 값 찾기
+    const ma200Entry = ma200Values.find(m => m.time === candle.time);
+    if (!ma200Entry) continue;
+
+    const ma200Price = ma200Entry.value;
+
+    // 캔들의 고가가 MA200 근처인지 확인 (터치 또는 교차)
+    const highDiff = Math.abs(candle.high - ma200Price) / ma200Price;
+    const lowDiff = Math.abs(candle.low - ma200Price) / ma200Price;
+
+    // 고가나 저가가 MA200 근처이면 (터치 또는 교차)
+    if (highDiff <= TOUCH_THRESHOLD || lowDiff <= TOUCH_THRESHOLD ||
+        (candle.low <= ma200Price && candle.high >= ma200Price)) {
+      touchPeaks.push({
+        index: i,
+        time: candle.time,
+        price: candle.high,
+      });
+    }
+  }
+
+  if (touchPeaks.length === 0) {
+    console.warn('MA200 터치 지점을 찾을 수 없음');
+    return [];
+  }
+
+  console.log('MA200 터치 지점 발견:', touchPeaks.length, '개');
+
+  // 최근 15일 범위로 제한
+  const FIFTEEN_DAYS = 15 * 24;
+  const recentStart = Math.max(0, candles.length - FIFTEEN_DAYS);
+  const recentPeaks = touchPeaks.filter(p => p.index >= recentStart);
+
+  if (recentPeaks.length === 0) {
+    console.warn('최근 15일 내 MA200 터치 지점 없음');
+    return [];
+  }
+
+  // 가격 순으로 정렬하여 가장 높은 2개 선택
+  const sortedByPrice = [...recentPeaks].sort((a, b) => b.price - a.price);
+  const topPeaks = sortedByPrice.slice(0, Math.min(2, sortedByPrice.length));
+
+  // 시간순으로 정렬
+  topPeaks.sort((a, b) => a.time - b.time);
+
+  console.log('MA200 터치 기반 고점 선택:', topPeaks);
+
+  return topPeaks;
+}
