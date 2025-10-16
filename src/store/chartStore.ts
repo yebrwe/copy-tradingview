@@ -383,18 +383,16 @@ export const useChartStore = create<ChartState>((set, get) => ({
       return true;
     });
 
-    const result = {
-      drawings: [...filteredDrawings, ...newDrawings],
-      channelBreakout: null, // 채널 재설정 시 돌파 상태 초기화
-    };
-
     // 진입점 계산 및 패턴 분류
     setTimeout(() => {
       get().calculateHighChannelEntryPoints();
       get().classifyChannelPattern();
     }, 0);
 
-    return result;
+    // 돌파 상태는 MA200 터치 시에만 초기화 (여기서는 유지)
+    return {
+      drawings: [...filteredDrawings, ...newDrawings],
+    };
   }),
 
   connectMajorLows: () => set((state) => {
