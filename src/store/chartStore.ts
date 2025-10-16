@@ -6,7 +6,7 @@ import type {
   DrawingTool,
   Drawing
 } from '../types/trading.types';
-import { findMajorPeaks, sortPeaksByTime, findAllTimeLow, findMajorLows, findAllTimeHigh, findPeaksNearMA200 } from '../utils/peakDetection';
+import { findMajorPeaks, sortPeaksByTime, findAllTimeLow, findMajorLows, findAllTimeHigh } from '../utils/peakDetection';
 
 interface EntryPoints {
   shortEntry: number | null;
@@ -178,7 +178,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   clearDrawings: () => set({ drawings: [], channelBreakout: null }),
 
   connectMajorPeaks: () => set((state) => {
-    const { candlestickData, channelBreakout, ma200Data } = state;
+    const { candlestickData, channelBreakout } = state;
 
     // 돌파 후 재설정인지 확인
     const isAfterBreakout = channelBreakout !== null;
@@ -222,25 +222,25 @@ export const useChartStore = create<ChartState>((set, get) => ({
     let sortedPeaks: Array<{ time: number; price: number }>;
 
     if (isAfterBreakout) {
-      // 돌파 후 재설정: MA200 터치 지점 기반
-      const ma200Peaks = findPeaksNearMA200(candlestickData, ma200Data);
-
-      if (ma200Peaks.length < 2) {
-        console.warn('MA200 터치 지점이 부족함, 기존 알고리즘 사용');
-        // 폴백: 기존 알고리즘 사용
-        const peaks = findMajorPeaks(candlestickData);
-        if (peaks.length < 2) {
-          console.warn('Not enough peaks detected');
-          return state;
-        }
-        sortedPeaks = sortPeaksByTime(peaks);
-      } else {
-        sortedPeaks = ma200Peaks.map(peak => ({
-          time: peak.time,
-          price: peak.price,
-        }));
-        console.log('MA200 터치 기반 전략:', sortedPeaks);
+      // 돌파 후 재설정: ATH + 현재 MA200 연결
+      const allTimeHigh = findAllTimeHigh(candlestickData);
+      if (!allTimeHigh) {
+        console.warn('Cannot find all-time high');
+        return state;
       }
+
+      const currentTime = candlestickData[candlestickData.length - 1].time;
+
+      sortedPeaks = [
+        { time: allTimeHigh.time, price: allTimeHigh.price },
+        { time: currentTime, price: ma200 }
+      ];
+
+      console.log('채널 돌파 후 재설정: ATH → 현재 MA200', {
+        ath: sortedPeaks[0],
+        ma200Point: sortedPeaks[1],
+        breakoutType: channelBreakout
+      });
 
     } else if (isPriceAboveMA200) {
       // MA200 위: 최고점 + 최고점 왼쪽(과거)의 고점
