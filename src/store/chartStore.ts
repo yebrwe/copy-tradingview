@@ -725,8 +725,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
       const currentPrice = candlestickData[candlestickData.length - 1].close;
 
-      // MA200 터치 임계값 (1.5%)
-      const touchThreshold = ma200 * 0.015;
+      // MA200 터치 임계값 (0.5%)
+      const touchThreshold = ma200 * 0.005;
       const priceDiff = Math.abs(currentPrice - ma200);
 
       console.log('MA200 터치 확인:', {
@@ -735,7 +735,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
         diff: priceDiff,
         diffPercent: ((priceDiff / ma200) * 100).toFixed(2) + '%',
         threshold: touchThreshold,
-        thresholdPercent: '1.5%',
+        thresholdPercent: '0.5%',
         willReset: priceDiff <= touchThreshold,
       });
 
