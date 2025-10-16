@@ -766,13 +766,14 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const upperPrice = highChannelEntryPoints.shortEntry;
     const lowerPrice = highChannelEntryPoints.longEntry;
 
-    // 빗각 기준 돌파 임계값 (각 라인 가격의 3%)
-    const upperThreshold = upperPrice * 0.03; // 상단선의 3%
-    const lowerThreshold = lowerPrice * 0.03; // 하단선의 3%
+    // 빗각 기준 돌파 임계값 (각 라인 가격의 5% - 스탑로스 비율 기준)
+    const BREAKOUT_THRESHOLD_PERCENT = 0.05; // 5% (기본 스탑로스 비율)
+    const upperThreshold = upperPrice * BREAKOUT_THRESHOLD_PERCENT;
+    const lowerThreshold = lowerPrice * BREAKOUT_THRESHOLD_PERCENT;
 
     let breakoutStatus: 'upper' | 'lower' | null = null;
 
-    // 상단 채널 돌파 확인 (상단선 + 상단선의 3% 이상)
+    // 상단 채널 돌파 확인 (상단선 + 상단선의 5% 이상)
     const upperBreakoutLine = upperPrice + upperThreshold;
     if (currentPrice > upperBreakoutLine) {
       breakoutStatus = 'upper';
@@ -781,12 +782,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
         upperPrice,
         breakoutLine: upperBreakoutLine,
         threshold: upperThreshold,
-        thresholdPercent: '3%',
+        thresholdPercent: (BREAKOUT_THRESHOLD_PERCENT * 100).toFixed(1) + '%',
         diff: currentPrice - upperPrice,
         diffPercent: ((currentPrice - upperPrice) / upperPrice * 100).toFixed(2) + '%',
       });
     }
-    // 하단 채널 돌파 확인 (하단선 - 하단선의 3% 이하)
+    // 하단 채널 돌파 확인 (하단선 - 하단선의 5% 이하)
     else {
       const lowerBreakoutLine = lowerPrice - lowerThreshold;
       if (currentPrice < lowerBreakoutLine) {
@@ -796,7 +797,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
           lowerPrice,
           breakoutLine: lowerBreakoutLine,
           threshold: lowerThreshold,
-          thresholdPercent: '3%',
+          thresholdPercent: (BREAKOUT_THRESHOLD_PERCENT * 100).toFixed(1) + '%',
           diff: lowerPrice - currentPrice,
           diffPercent: ((lowerPrice - currentPrice) / lowerPrice * 100).toFixed(2) + '%',
         });
