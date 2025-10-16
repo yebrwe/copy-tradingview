@@ -22,10 +22,16 @@ interface RecommendedEntry {
 
 type ChannelPattern = 'ascending' | 'descending' | 'symmetrical' | 'ranging' | 'none';
 
+interface LineData {
+  time: number;
+  value: number;
+}
+
 interface ChartState {
   // 차트 데이터
   candlestickData: CandlestickData[];
   volumeData: VolumeData[];
+  ma200Data: LineData[]; // MA200 이동평균선 데이터
 
   // 백테스팅
   isBacktesting: boolean;
@@ -75,10 +81,36 @@ interface ChartState {
   recalculateChannels: () => void;
 }
 
+// MA200 계산 헬퍼 함수
+const calculateMA200 = (candlestickData: CandlestickData[]): LineData[] => {
+  const ma200Period = 200;
+  const result: LineData[] = [];
+
+  if (candlestickData.length < ma200Period) {
+    return result; // 데이터가 부족하면 빈 배열 반환
+  }
+
+  // MA200을 각 캔들에 대해 계산
+  for (let i = ma200Period - 1; i < candlestickData.length; i++) {
+    let sum = 0;
+    for (let j = i - ma200Period + 1; j <= i; j++) {
+      sum += candlestickData[j].close;
+    }
+    const ma200Value = sum / ma200Period;
+    result.push({
+      time: candlestickData[i].time,
+      value: ma200Value,
+    });
+  }
+
+  return result;
+};
+
 export const useChartStore = create<ChartState>((set, get) => ({
   // 초기 상태
   candlestickData: [],
   volumeData: [],
+  ma200Data: [],
   isBacktesting: false,
   fullCandlestickData: [],
   fullVolumeData: [],
@@ -99,26 +131,33 @@ export const useChartStore = create<ChartState>((set, get) => ({
   recommendedEntries: [],
 
   // 액션들
-  setCandlestickData: (data) => set({ candlestickData: data }),
+  setCandlestickData: (data) => {
+    const ma200Data = calculateMA200(data);
+    set({ candlestickData: data, ma200Data });
+  },
 
   updateLastCandle: (candle) => set((state) => {
     const data = [...state.candlestickData];
     if (data.length > 0) {
       data[data.length - 1] = candle;
     }
-    return { candlestickData: data };
+    const ma200Data = calculateMA200(data);
+    return { candlestickData: data, ma200Data };
   }),
 
-  addCandle: (candle) => set((state) => ({
-    candlestickData: [...state.candlestickData, candle]
-  })),
+  addCandle: (candle) => set((state) => {
+    const data = [...state.candlestickData, candle];
+    const ma200Data = calculateMA200(data);
+    return { candlestickData: data, ma200Data };
+  }),
 
   setVolumeData: (data) => set({ volumeData: data }),
 
   setTimeFrame: (timeFrame) => set({
     timeFrame,
     candlestickData: [], // 타임프레임 변경시 데이터 초기화
-    volumeData: []
+    volumeData: [],
+    ma200Data: []
   }),
 
   setSelectedTool: (tool) => set({ selectedTool: tool }),
@@ -555,10 +594,13 @@ export const useChartStore = create<ChartState>((set, get) => ({
     console.log(`백테스팅 시점 이동: ${clampedIndex + 1} / ${state.fullCandlestickData.length}`);
 
     // 해당 인덱스까지의 데이터만 표시
+    const slicedData = state.fullCandlestickData.slice(0, clampedIndex + 1);
+    const ma200Data = calculateMA200(slicedData);
     set({
       backtestingIndex: clampedIndex,
-      candlestickData: state.fullCandlestickData.slice(0, clampedIndex + 1),
+      candlestickData: slicedData,
       volumeData: state.fullVolumeData.slice(0, clampedIndex + 1),
+      ma200Data,
       drawings: [], // 드로잉 초기화
     });
 

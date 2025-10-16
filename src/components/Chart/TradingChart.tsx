@@ -10,11 +10,12 @@ export const TradingChart = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const ma200SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRestoringRange = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
 
-  const { candlestickData, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern } = useChartStore();
+  const { candlestickData, ma200Data, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern } = useChartStore();
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -56,6 +57,17 @@ export const TradingChart = () => {
     });
 
     candlestickSeriesRef.current = candlestickSeries;
+
+    // MA200 라인 시리즈 추가
+    const ma200Series = chart.addLineSeries({
+      color: '#ffa500', // 주황색
+      lineWidth: 2,
+      title: 'MA200',
+      priceLineVisible: false,
+      lastValueVisible: true,
+    });
+
+    ma200SeriesRef.current = ma200Series;
 
     // 차트 범위 변경 시 localStorage에 저장
     const saveVisibleRange = () => {
@@ -110,6 +122,13 @@ export const TradingChart = () => {
       }
     }
   }, [candlestickData]);
+
+  // MA200 데이터 업데이트
+  useEffect(() => {
+    if (ma200SeriesRef.current && ma200Data.length > 0) {
+      ma200SeriesRef.current.setData(ma200Data);
+    }
+  }, [ma200Data]);
 
   // Drawing 오버레이 그리기 (애니메이션 포함)
   useEffect(() => {
