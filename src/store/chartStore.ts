@@ -703,7 +703,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
       return;
     }
 
-    // 돌파 상태인 경우 MA200 터치 확인
+    // 돌파 상태인 경우 MA200 터치만 확인 (채널 내/외 확인 스킵)
     if (channelBreakout !== null) {
       // MA200 계산
       const ma200Period = 200;
@@ -741,8 +741,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
         set({ channelBreakout: null });
         console.log('💡 이제 "고점 연결" 버튼으로 일반 채널을 생성할 수 있습니다.');
-        return;
       }
+
+      // 돌파 상태일 때는 MA200 터치 확인만 하고 종료 (채널 내/외 재확인 안함)
+      return;
     }
 
     // 고점 채널만 사용하므로 highChannelEntryPoints만 확인
