@@ -569,6 +569,81 @@ export const createLimitOrder = async (
   });
 };
 
+/**
+ * User Data Stream Listen Key 생성
+ */
+export const createListenKey = async (): Promise<string> => {
+  if (!config.apiKey || !config.apiSecret) {
+    throw new Error('API credentials not set.');
+  }
+
+  try {
+    const response = await fetch(`${FUTURES_API_BASE_URL}/fapi/v1/listenKey`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Binance API Error: ${error.msg || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.listenKey;
+  } catch (error) {
+    console.error('Create listen key error:', error);
+    throw error;
+  }
+};
+
+/**
+ * User Data Stream Listen Key 갱신
+ */
+export const keepAliveListenKey = async (): Promise<void> => {
+  if (!config.apiKey || !config.apiSecret) {
+    throw new Error('API credentials not set.');
+  }
+
+  try {
+    const response = await fetch(`${FUTURES_API_BASE_URL}/fapi/v1/listenKey`, {
+      method: 'PUT',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Binance API Error: ${error.msg || response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Keep alive listen key error:', error);
+    throw error;
+  }
+};
+
+/**
+ * User Data Stream Listen Key 삭제
+ */
+export const deleteListenKey = async (): Promise<void> => {
+  if (!config.apiKey || !config.apiSecret) {
+    throw new Error('API credentials not set.');
+  }
+
+  try {
+    const response = await fetch(`${FUTURES_API_BASE_URL}/fapi/v1/listenKey`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Binance API Error: ${error.msg || response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Delete listen key error:', error);
+    throw error;
+  }
+};
+
 export const BinanceFuturesAPI = {
   setApiCredentials,
   getLeverage,
@@ -586,4 +661,7 @@ export const BinanceFuturesAPI = {
   getSymbolInfo,
   adjustQuantityPrecision,
   adjustPricePrecision,
+  createListenKey,
+  keepAliveListenKey,
+  deleteListenKey,
 };

@@ -4,8 +4,9 @@ import { useChartStore } from '../../store/chartStore';
 import { useAutoTrading } from '../../hooks/useAutoTrading';
 import { useToastStore } from '../../store/toastStore';
 import { useOrderHistoryStore } from '../../store/orderHistoryStore';
+import { useUserDataStream } from '../../hooks/useUserDataStream';
 
-type TabType = 'trading' | 'backtesting' | 'guide';
+type TabType = 'trading' | 'positions' | 'backtesting' | 'guide';
 
 // localStorage 키
 const STORAGE_KEYS = {
@@ -88,6 +89,9 @@ export const TradingPanel = () => {
   // 백테스팅 관련
   const [isPlaying, setIsPlaying] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(1); // 캔들 / 초
+
+  // User Data Stream (실시간 포지션 & 주문)
+  const { positions, orders, isConnected: isStreamConnected, error: streamError } = useUserDataStream(isApiConfigured);
 
   // localStorage에 값 저장
   useEffect(() => {
@@ -610,6 +614,19 @@ export const TradingPanel = () => {
           거래
         </button>
         <button
+          onClick={() => setActiveTab('positions')}
+          className={`px-4 py-2 font-semibold transition-colors relative ${
+            activeTab === 'positions'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          포지션 & 주문
+          {isStreamConnected && (
+            <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('backtesting')}
           className={`px-4 py-2 font-semibold transition-colors ${
             activeTab === 'backtesting'
@@ -942,6 +959,170 @@ export const TradingPanel = () => {
           </button>
         </div>
       )}
+        </>
+      )}
+
+      {/* Positions Tab */}
+      {activeTab === 'positions' && (
+        <>
+          {!isApiConfigured ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400 mb-2">API 설정이 필요합니다</p>
+              <p className="text-sm text-gray-500">거래 탭에서 API를 설정해주세요</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 연결 상태 */}
+              <div className="flex items-center justify-between p-3 bg-gray-750 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isStreamConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className="text-sm font-semibold">
+                    {isStreamConnected ? '실시간 연결됨' : '연결 끊김'}
+                  </span>
+                </div>
+                {streamError && (
+                  <span className="text-xs text-red-400">{streamError}</span>
+                )}
+              </div>
+
+              {/* 포지션 섹션 */}
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                  포지션
+                  <span className="text-xs text-gray-400">({positions.length})</span>
+                </h3>
+                {positions.length === 0 ? (
+                  <div className="text-center py-6 bg-gray-750 rounded-lg border border-gray-600">
+                    <p className="text-gray-400 text-sm">현재 보유 중인 포지션이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {positions.map((position, index) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border ${
+                          position.positionAmt > 0
+                            ? 'bg-green-900/20 border-green-500'
+                            : 'bg-red-900/20 border-red-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-white">{position.symbol}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              position.positionAmt > 0
+                                ? 'bg-green-600 text-white'
+                                : 'bg-red-600 text-white'
+                            }`}>
+                              {position.positionAmt > 0 ? 'LONG' : 'SHORT'}
+                            </span>
+                            <span className="text-xs text-gray-400">{position.leverage}x</span>
+                          </div>
+                          <div className={`font-semibold ${
+                            position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {position.unrealizedProfit >= 0 ? '+' : ''}${position.unrealizedProfit.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-400">수량: </span>
+                            <span className="text-white">{Math.abs(position.positionAmt).toFixed(4)}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">진입가: </span>
+                            <span className="text-white">${position.entryPrice.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 미체결 주문 섹션 */}
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                  미체결 주문
+                  <span className="text-xs text-gray-400">({orders.length})</span>
+                </h3>
+                {orders.length === 0 ? (
+                  <div className="text-center py-6 bg-gray-750 rounded-lg border border-gray-600">
+                    <p className="text-gray-400 text-sm">미체결 주문이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {orders.map((order, index) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border ${
+                          order.side === 'BUY'
+                            ? 'bg-green-900/10 border-green-700'
+                            : 'bg-red-900/10 border-red-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-white text-sm">{order.symbol}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              order.side === 'BUY'
+                                ? 'bg-green-600 text-white'
+                                : 'bg-red-600 text-white'
+                            }`}>
+                              {order.side}
+                            </span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white">
+                              {order.type}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-400">#{order.orderId}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-400">가격: </span>
+                            <span className="text-white">
+                              ${order.type.includes('MARKET') ? '시장가' : order.price.toFixed(2)}
+                            </span>
+                          </div>
+                          {order.stopPrice && (
+                            <div>
+                              <span className="text-gray-400">트리거: </span>
+                              <span className="text-white">${order.stopPrice.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-gray-400">수량: </span>
+                            <span className="text-white">{order.origQty.toFixed(4)}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">체결: </span>
+                            <span className="text-white">{order.executedQty.toFixed(4)}</span>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs">
+                          <span className="text-gray-400">상태: </span>
+                          <span className={`font-semibold ${
+                            order.status === 'NEW' ? 'text-blue-400' :
+                            order.status === 'PARTIALLY_FILLED' ? 'text-yellow-400' :
+                            'text-gray-400'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 안내 */}
+              <div className="p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+                <p className="text-xs text-blue-300">
+                  💡 이 정보는 바이낸스 WebSocket을 통해 실시간으로 업데이트됩니다.
+                </p>
+              </div>
+            </div>
+          )}
         </>
       )}
 
