@@ -173,15 +173,91 @@ export const useChartStore = create<ChartState>((set, get) => ({
   clearDrawings: () => set({ drawings: [] }),
 
   connectMajorPeaks: () => set((state) => {
-    const peaks = findMajorPeaks(state.candlestickData);
+    const { candlestickData } = state;
 
-    if (peaks.length < 2) {
-      console.warn('Not enough peaks detected');
-      return state;
+    // MA200 계산
+    const ma200Period = 200;
+    let ma200 = 0;
+    if (candlestickData.length >= ma200Period) {
+      let sum = 0;
+      for (let i = candlestickData.length - ma200Period; i < candlestickData.length; i++) {
+        sum += candlestickData[i].close;
+      }
+      ma200 = sum / ma200Period;
+    } else {
+      let sum = 0;
+      for (const candle of candlestickData) {
+        sum += candle.close;
+      }
+      ma200 = sum / candlestickData.length;
     }
 
-    // 시간 순으로 정렬
-    const sortedPeaks = sortPeaksByTime(peaks);
+    const currentPrice = candlestickData[candlestickData.length - 1].close;
+    const isPriceAboveMA200 = currentPrice > ma200;
+
+    console.log('Peak connection strategy:', {
+      currentPrice,
+      ma200,
+      isPriceAboveMA200,
+      strategy: isPriceAboveMA200
+        ? '최고점 + 최고점 왼쪽(과거) 고점 연결'
+        : '기존 알고리즘 (6시간 & 15일 고점)'
+    });
+
+    let sortedPeaks: Array<{ time: number; price: number }>;
+
+    if (isPriceAboveMA200) {
+      // MA200 위: 최고점 + 최고점 왼쪽(과거)의 고점
+      const allTimeHigh = findAllTimeHigh(candlestickData);
+      if (!allTimeHigh) {
+        console.warn('Cannot find all-time high');
+        return state;
+      }
+
+      // 최고점의 인덱스 찾기
+      let athIndex = -1;
+      for (let i = 0; i < candlestickData.length; i++) {
+        if (candlestickData[i].time === allTimeHigh.time &&
+            Math.abs(candlestickData[i].high - allTimeHigh.price) < 0.01) {
+          athIndex = i;
+          break;
+        }
+      }
+
+      if (athIndex <= 0) {
+        console.warn('All-time high is at the beginning, cannot find older peak');
+        return state;
+      }
+
+      // 최고점 왼쪽(과거) 영역에서 고점 찾기
+      const leftCandles = candlestickData.slice(0, athIndex);
+      let leftPeak = leftCandles[0];
+      for (const candle of leftCandles) {
+        if (candle.high > leftPeak.high) {
+          leftPeak = candle;
+        }
+      }
+
+      sortedPeaks = [
+        { time: leftPeak.time, price: leftPeak.high },
+        { time: allTimeHigh.time, price: allTimeHigh.price }
+      ];
+
+      console.log('MA200 위 전략: 왼쪽 고점 → 최고점', sortedPeaks);
+
+    } else {
+      // MA200 아래: 기존 알고리즘 (6시간 & 15일 고점)
+      const peaks = findMajorPeaks(candlestickData);
+
+      if (peaks.length < 2) {
+        console.warn('Not enough peaks detected');
+        return state;
+      }
+
+      // 시간 순으로 정렬
+      sortedPeaks = sortPeaksByTime(peaks);
+      console.log('MA200 아래 전략: 기존 알고리즘', sortedPeaks);
+    }
 
     // 추세선 Drawing 생성 (고점 연결)
     const trendline: Drawing = {
