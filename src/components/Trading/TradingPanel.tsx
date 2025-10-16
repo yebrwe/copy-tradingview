@@ -5,7 +5,7 @@ import { useAutoTrading } from '../../hooks/useAutoTrading';
 import { useToastStore } from '../../store/toastStore';
 import { useOrderHistoryStore } from '../../store/orderHistoryStore';
 
-type TabType = 'trading' | 'backtesting';
+type TabType = 'trading' | 'backtesting' | 'guide';
 
 // localStorage 키
 const STORAGE_KEYS = {
@@ -619,6 +619,16 @@ export const TradingPanel = () => {
         >
           백테스팅
         </button>
+        <button
+          onClick={() => setActiveTab('guide')}
+          className={`px-4 py-2 font-semibold transition-colors ${
+            activeTab === 'guide'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          안내
+        </button>
       </div>
 
       {/* Trading Tab */}
@@ -1078,6 +1088,41 @@ export const TradingPanel = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Guide Tab */}
+      {activeTab === 'guide' && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-green-400 mb-2">📊 채널 트레이딩 전략</h3>
+            <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm">
+              <li><strong>고점 채널:</strong> 6시간 & 15일 고점을 연결 (초록색) - 하락 추세 감지</li>
+              <li><strong>저점 채널:</strong> 6시간 & 15일 저점을 연결 (빨간색) - 상승 추세 감지</li>
+              <li>차트에 진입점 마커가 표시됩니다 (▼ 숏 진입, ▲ 롱 진입)</li>
+              <li>헤더에 양방향 실시간 진입점 가격이 표시됩니다</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-yellow-400 mb-2">🎯 이평선 기반 전략</h3>
+            <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm">
+              <li><strong className="text-green-400">상승 추세:</strong> 현재 가격 &gt; 200일 이평선 → 저점채널 진입</li>
+              <li><strong className="text-red-400">하락 추세:</strong> 현재 가격 &lt; 200일 이평선 → 고점채널 진입</li>
+              <li>200일 이동평균선을 기준으로 추세를 판단하여 사용할 채널 결정</li>
+              <li>각 채널에서 롱/숏 양방향 진입점 제공 (주 전략 + 보조 전략)</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-blue-400 mb-2">⚡ 자동 거래</h3>
+            <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm">
+              <li>거래 탭에서 바이낸스 선물 거래를 실행할 수 있습니다</li>
+              <li>API Key 설정 후 롱/숏 진입이 가능하며 스탑로스/테이크프로핏 설정이 지원됩니다</li>
+              <li>자동 거래 토글 ON 시 1시간마다 자동으로 주문이 갱신됩니다 (새로운 캔들 생성 후 10분 대기)</li>
+              <li>1시간봉 차트로 고정되어 있으며, 실시간 가격 데이터가 바이낸스 WebSocket을 통해 업데이트됩니다</li>
+            </ul>
+          </div>
+        </div>
       )}
     </div>
   );

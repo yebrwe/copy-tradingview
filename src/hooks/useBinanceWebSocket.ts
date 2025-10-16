@@ -39,13 +39,45 @@ export const useBinanceWebSocket = () => {
           setVolumeData(volumes);
           console.log(`Loaded ${candlesticks.length} candles`);
 
-          // 데이터 로드 후 자동으로 양방향 채널 생성
+          // 데이터 로드 후 MA200 기반 패턴 판단 후 해당 채널만 생성
           setTimeout(() => {
-            connectMajorPeaks();
-            // 고점 채널 생성 후 저점 채널도 생성
-            setTimeout(() => {
+            // MA200 계산
+            const ma200Period = 200;
+            let ma200 = 0;
+
+            if (candlesticks.length >= ma200Period) {
+              let sum = 0;
+              for (let i = candlesticks.length - ma200Period; i < candlesticks.length; i++) {
+                sum += candlesticks[i].close;
+              }
+              ma200 = sum / ma200Period;
+            } else if (candlesticks.length > 0) {
+              // 데이터가 부족하면 전체 평균 사용
+              let sum = 0;
+              for (const candle of candlesticks) {
+                sum += candle.close;
+              }
+              ma200 = sum / candlesticks.length;
+            }
+
+            const currentPrice = candlesticks[candlesticks.length - 1].close;
+
+            console.log('MA200 기반 패턴 판단:', {
+              currentPrice,
+              ma200,
+              pattern: currentPrice > ma200 ? 'ascending' : 'descending'
+            });
+
+            // 패턴에 따라 해당 채널만 생성
+            if (currentPrice > ma200) {
+              // 상승 추세 → 저점 채널만 생성
+              console.log('상승 추세 감지: 저점 채널만 생성');
               connectMajorLows();
-            }, 200);
+            } else {
+              // 하락 추세 → 고점 채널만 생성
+              console.log('하락 추세 감지: 고점 채널만 생성');
+              connectMajorPeaks();
+            }
           }, 100);
         }
       } catch (error) {

@@ -606,12 +606,46 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     set({ drawings: manualDrawings });
 
-    // 고점/저점 채널 자동 생성
+    // MA200 계산 및 패턴 판단 후 해당 채널만 생성
     setTimeout(() => {
-      get().connectMajorPeaks();
-      setTimeout(() => {
+      const { candlestickData } = get();
+
+      // MA200 계산
+      const ma200Period = 200;
+      let ma200 = 0;
+
+      if (candlestickData.length >= ma200Period) {
+        let sum = 0;
+        for (let i = candlestickData.length - ma200Period; i < candlestickData.length; i++) {
+          sum += candlestickData[i].close;
+        }
+        ma200 = sum / ma200Period;
+      } else if (candlestickData.length > 0) {
+        let sum = 0;
+        for (const candle of candlestickData) {
+          sum += candle.close;
+        }
+        ma200 = sum / candlestickData.length;
+      }
+
+      const currentPrice = candlestickData[candlestickData.length - 1].close;
+
+      console.log('백테스팅 MA200 기반 패턴 판단:', {
+        currentPrice,
+        ma200,
+        pattern: currentPrice > ma200 ? 'ascending' : 'descending'
+      });
+
+      // 패턴에 따라 해당 채널만 생성
+      if (currentPrice > ma200) {
+        // 상승 추세 → 저점 채널만 생성
+        console.log('백테스팅: 상승 추세 감지, 저점 채널만 생성');
         get().connectMajorLows();
-      }, 100);
+      } else {
+        // 하락 추세 → 고점 채널만 생성
+        console.log('백테스팅: 하락 추세 감지, 고점 채널만 생성');
+        get().connectMajorPeaks();
+      }
     }, 100);
   },
 }));
