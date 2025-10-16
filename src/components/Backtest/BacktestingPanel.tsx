@@ -73,15 +73,11 @@ export const BacktestingPanel = () => {
   const getStrategyDescription = () => {
     switch (channelPattern) {
       case 'ascending':
-        return '상승 채널 - 저점채널 롱 진입 추천';
+        return '상승 추세 - 저점채널 진입 (가격 > MA200)';
       case 'descending':
-        return '하락 채널 - 고점채널 숏 진입 추천';
-      case 'symmetrical':
-        return '대칭 수렴 - 돌파 대기';
-      case 'ranging':
-        return '횡보 - 채널 내 양방향 거래';
+        return '하락 추세 - 고점채널 진입 (가격 < MA200)';
       default:
-        return '패턴 분석 중...';
+        return '추세 분석 중...';
     }
   };
 
@@ -129,8 +125,6 @@ export const BacktestingPanel = () => {
         <div className={`text-lg font-semibold mb-2 ${
           channelPattern === 'ascending' ? 'text-green-400' :
           channelPattern === 'descending' ? 'text-red-400' :
-          channelPattern === 'symmetrical' ? 'text-yellow-400' :
-          channelPattern === 'ranging' ? 'text-gray-400' :
           'text-gray-500'
         }`}>
           {getStrategyDescription()}
@@ -162,12 +156,6 @@ export const BacktestingPanel = () => {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {recommendedEntries.length === 0 && channelPattern === 'symmetrical' && (
-          <div className="text-sm text-gray-400 mt-2">
-            ⚠️ 대칭 수렴 패턴은 돌파 방향이 불확실하므로 진입점을 추천하지 않습니다.
           </div>
         )}
       </div>

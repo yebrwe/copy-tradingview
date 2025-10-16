@@ -395,69 +395,55 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   classifyChannelPattern: () => {
     const state = get();
-    const { drawings } = state;
-
-    // 고점 채널과 저점 채널 찾기
-    const highUpper = drawings.find(d => d.id.startsWith('auto-trendline-') && !d.id.includes('low'));
-    const highLower = drawings.find(d => d.id.startsWith('auto-parallel-') && !d.id.includes('low'));
-    const lowLower = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
-    const lowUpper = drawings.find(d => d.id.startsWith('auto-parallel-low-'));
+    const { candlestickData, drawings } = state;
 
     // 채널이 없으면 패턴 없음
-    if (!highUpper || !highLower || !lowLower || !lowUpper) {
+    const highUpper = drawings.find(d => d.id.startsWith('auto-trendline-') && !d.id.includes('low'));
+    const lowLower = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
+
+    if (!highUpper || !lowLower || candlestickData.length < 200) {
       set({ channelPattern: 'none' });
       return;
     }
 
-    // 기울기 계산 함수 (시간당 가격 변화율로 정규화)
-    const calculateSlope = (line: Drawing): number => {
-      const p1 = line.points[0];
-      const p2 = line.points[1];
-      const timeDiffHours = (p2.time - p1.time) / 3600; // 초를 시간으로 변환
-      return (p2.price - p1.price) / timeDiffHours; // 시간당 가격 변화
-    };
+    // 장기 이동평균선 계산 (200일)
+    const ma200Period = 200;
+    let ma200 = 0;
 
-    const highChannelSlope = calculateSlope(highUpper);
-    const lowChannelSlope = calculateSlope(lowLower);
-
-    // 기울기 임계값 (시간당 가격 변화 기준)
-    const avgPrice = (highUpper.points[0].price + lowLower.points[0].price) / 2;
-    const flatThreshold = avgPrice * 0.0001; // 시간당 평균 가격의 0.01% 변화
-
-    const isHighFlat = Math.abs(highChannelSlope) < flatThreshold;
-    const isLowFlat = Math.abs(lowChannelSlope) < flatThreshold;
-    const isHighRising = highChannelSlope > flatThreshold;
-    const isHighFalling = highChannelSlope < -flatThreshold;
-    const isLowRising = lowChannelSlope > flatThreshold;
-    const isLowFalling = lowChannelSlope < -flatThreshold;
-
-    let pattern: ChannelPattern = 'none';
-
-    // 패턴 분류 로직 (리서치 기반)
-    if (isLowRising && (isHighFlat || isHighRising)) {
-      // 저점 상승 + 고점 평평/상승 = Ascending (상승 채널)
-      pattern = 'ascending';
-    } else if (isHighFalling && (isLowFlat || isLowFalling)) {
-      // 고점 하락 + 저점 평평/하락 = Descending (하락 채널)
-      pattern = 'descending';
-    } else if (isHighFalling && isLowRising) {
-      // 고점 하락 + 저점 상승 = Symmetrical (대칭 수렴)
-      pattern = 'symmetrical';
-    } else if (isHighFlat && isLowFlat) {
-      // 고점 평평 + 저점 평평 = Ranging (횡보)
-      pattern = 'ranging';
+    if (candlestickData.length >= ma200Period) {
+      let sum = 0;
+      for (let i = candlestickData.length - ma200Period; i < candlestickData.length; i++) {
+        sum += candlestickData[i].close;
+      }
+      ma200 = sum / ma200Period;
+    } else {
+      // 데이터가 부족하면 전체 평균 사용
+      let sum = 0;
+      for (const candle of candlestickData) {
+        sum += candle.close;
+      }
+      ma200 = sum / candlestickData.length;
     }
 
-    console.log('Channel pattern classified:', {
+    // 현재 가격
+    const currentPrice = candlestickData[candlestickData.length - 1].close;
+
+    // 이평선 기준 추세 판단
+    let pattern: ChannelPattern = 'none';
+
+    if (currentPrice > ma200) {
+      // 현재 가격이 이평선 위 → 상승 추세 → 저점 채널 사용
+      pattern = 'ascending';
+    } else {
+      // 현재 가격이 이평선 아래 → 하락 추세 → 고점 채널 사용
+      pattern = 'descending';
+    }
+
+    console.log('Channel pattern classified (MA200 based):', {
       pattern,
-      highChannelSlope,
-      lowChannelSlope,
-      isHighFlat,
-      isLowFlat,
-      isHighRising,
-      isHighFalling,
-      isLowRising,
-      isLowFalling,
+      currentPrice,
+      ma200,
+      priceAboveMA: currentPrice > ma200,
     });
 
     set({ channelPattern: pattern });
@@ -474,95 +460,46 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     const recommended: RecommendedEntry[] = [];
 
-    // 패턴별 추천 전략
-    switch (channelPattern) {
-      case 'ascending':
-        // 상승 채널: 저점채널 롱 (주), 고점채널 롱 (보조)
-        if (lowChannelEntryPoints.longEntry !== null) {
-          recommended.push({
-            price: lowChannelEntryPoints.longEntry,
-            type: 'long',
-            channel: 'low',
-            priority: 'primary',
-          });
-        }
-        if (highChannelEntryPoints.longEntry !== null) {
-          recommended.push({
-            price: highChannelEntryPoints.longEntry,
-            type: 'long',
-            channel: 'high',
-            priority: 'secondary',
-          });
-        }
-        break;
-
-      case 'descending':
-        // 하락 채널: 고점채널 숏 (주), 저점채널 숏 (보조)
-        if (highChannelEntryPoints.shortEntry !== null) {
-          recommended.push({
-            price: highChannelEntryPoints.shortEntry,
-            type: 'short',
-            channel: 'high',
-            priority: 'primary',
-          });
-        }
-        if (lowChannelEntryPoints.shortEntry !== null) {
-          recommended.push({
-            price: lowChannelEntryPoints.shortEntry,
-            type: 'short',
-            channel: 'low',
-            priority: 'secondary',
-          });
-        }
-        break;
-
-      case 'symmetrical':
-        // 대칭 수렴: 돌파 대기 - 진입점 추천하지 않음 (돌파 방향 불확실)
-        // 추천 진입점 없음 (빈 배열)
-        break;
-
-      case 'ranging':
-        // 횡보: 양방향 거래 - 고점채널 숏, 저점채널 롱
-        if (highChannelEntryPoints.shortEntry !== null) {
-          recommended.push({
-            price: highChannelEntryPoints.shortEntry,
-            type: 'short',
-            channel: 'high',
-            priority: 'primary',
-          });
-        }
-        if (lowChannelEntryPoints.longEntry !== null) {
-          recommended.push({
-            price: lowChannelEntryPoints.longEntry,
-            type: 'long',
-            channel: 'low',
-            priority: 'primary',
-          });
-        }
-        break;
-
-      default:
-        // 패턴 없음: 고점채널 기본 전략
-        if (highChannelEntryPoints.shortEntry !== null) {
-          recommended.push({
-            price: highChannelEntryPoints.shortEntry,
-            type: 'short',
-            channel: 'high',
-            priority: 'primary',
-          });
-        }
-        if (highChannelEntryPoints.longEntry !== null) {
-          recommended.push({
-            price: highChannelEntryPoints.longEntry,
-            type: 'long',
-            channel: 'high',
-            priority: 'secondary',
-          });
-        }
-        break;
+    // 이평선 기반 단순화된 전략
+    if (channelPattern === 'ascending') {
+      // 상승 추세 (가격 > MA200) → 저점 채널 사용
+      if (lowChannelEntryPoints.longEntry !== null) {
+        recommended.push({
+          price: lowChannelEntryPoints.longEntry,
+          type: 'long',
+          channel: 'low',
+          priority: 'primary',
+        });
+      }
+      if (lowChannelEntryPoints.shortEntry !== null) {
+        recommended.push({
+          price: lowChannelEntryPoints.shortEntry,
+          type: 'short',
+          channel: 'low',
+          priority: 'secondary',
+        });
+      }
+    } else if (channelPattern === 'descending') {
+      // 하락 추세 (가격 < MA200) → 고점 채널 사용
+      if (highChannelEntryPoints.shortEntry !== null) {
+        recommended.push({
+          price: highChannelEntryPoints.shortEntry,
+          type: 'short',
+          channel: 'high',
+          priority: 'primary',
+        });
+      }
+      if (highChannelEntryPoints.longEntry !== null) {
+        recommended.push({
+          price: highChannelEntryPoints.longEntry,
+          type: 'long',
+          channel: 'high',
+          priority: 'secondary',
+        });
+      }
     }
 
-    console.log('Recommended entries:', recommended);
+    console.log('Recommended entries (MA200 based):', recommended);
     set({ recommendedEntries: recommended });
   },
 

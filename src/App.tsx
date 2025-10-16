@@ -78,13 +78,10 @@ function App() {
                   <span className={`font-semibold ${
                     channelPattern === 'ascending' ? 'text-green-400' :
                     channelPattern === 'descending' ? 'text-red-400' :
-                    channelPattern === 'symmetrical' ? 'text-yellow-400' :
                     'text-gray-400'
                   }`}>
-                    {channelPattern === 'ascending' && '저점채널 롱 진입'}
-                    {channelPattern === 'descending' && '고점채널 숏 진입'}
-                    {channelPattern === 'symmetrical' && '돌파 대기'}
-                    {channelPattern === 'ranging' && '채널 내 양방향'}
+                    {channelPattern === 'ascending' && '저점채널 진입 (상승 추세)'}
+                    {channelPattern === 'descending' && '고점채널 진입 (하락 추세)'}
                   </span>
                 </div>
               </>
@@ -133,12 +130,12 @@ function App() {
           </div>
 
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">🎯 패턴별 전략</h3>
+            <h3 className="text-lg font-semibold text-yellow-400 mb-2">🎯 이평선 기반 전략</h3>
             <ul className="list-disc list-inside space-y-1 text-gray-300">
-              <li><strong className="text-green-400">상승 채널 (Ascending):</strong> 저점이 계속 높아짐 → 저점채널 롱 진입 추천</li>
-              <li><strong className="text-red-400">하락 채널 (Descending):</strong> 고점이 계속 낮아짐 → 고점채널 숏 진입 추천</li>
-              <li><strong className="text-yellow-400">대칭 수렴 (Symmetrical):</strong> 고점↓ 저점↑ 수렴 → 돌파 대기 후 진입</li>
-              <li><strong className="text-gray-400">횡보 (Ranging):</strong> 고점/저점 평평 → 채널 내 양방향 거래</li>
+              <li><strong className="text-green-400">상승 추세:</strong> 현재 가격 &gt; 200일 이평선 → 저점채널 진입</li>
+              <li><strong className="text-red-400">하락 추세:</strong> 현재 가격 &lt; 200일 이평선 → 고점채널 진입</li>
+              <li>200일 이동평균선을 기준으로 추세를 판단하여 사용할 채널 결정</li>
+              <li>각 채널에서 롱/숏 양방향 진입점 제공 (주 전략 + 보조 전략)</li>
             </ul>
           </div>
 
