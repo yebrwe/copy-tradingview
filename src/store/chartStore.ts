@@ -699,10 +699,52 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   checkChannelBreakout: () => {
     const state = get();
-    const { candlestickData, highChannelEntryPoints } = state;
+    const { candlestickData, highChannelEntryPoints, channelBreakout } = state;
 
     if (candlestickData.length === 0) {
       return;
+    }
+
+    // 돌파 상태인 경우 MA200 터치 확인
+    if (channelBreakout !== null) {
+      // MA200 계산
+      const ma200Period = 200;
+      let ma200 = 0;
+
+      if (candlestickData.length >= ma200Period) {
+        let sum = 0;
+        for (let i = candlestickData.length - ma200Period; i < candlestickData.length; i++) {
+          sum += candlestickData[i].close;
+        }
+        ma200 = sum / ma200Period;
+      } else {
+        let sum = 0;
+        for (const candle of candlestickData) {
+          sum += candle.close;
+        }
+        ma200 = sum / candlestickData.length;
+      }
+
+      const currentPrice = candlestickData[candlestickData.length - 1].close;
+
+      // MA200 터치 임계값 (0.3%)
+      const touchThreshold = ma200 * 0.003;
+      const priceDiff = Math.abs(currentPrice - ma200);
+
+      // MA200 터치 감지
+      if (priceDiff <= touchThreshold) {
+        console.log('✅ MA200 터치 감지! 돌파 상태 해제:', {
+          currentPrice,
+          ma200,
+          diff: priceDiff,
+          threshold: touchThreshold,
+          previousBreakout: channelBreakout,
+        });
+
+        set({ channelBreakout: null });
+        console.log('💡 이제 "고점 연결" 버튼으로 일반 채널을 생성할 수 있습니다.');
+        return;
+      }
     }
 
     // 고점 채널만 사용하므로 highChannelEntryPoints만 확인
