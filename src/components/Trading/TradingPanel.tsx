@@ -40,6 +40,7 @@ export const TradingPanel = () => {
     setBacktestingIndex,
     channelPattern,
     recommendedEntries,
+    channelBreakout,
   } = useChartStore();
   const { showSuccess, showError, showWarning } = useToastStore();
   const { addOrder } = useOrderHistoryStore();
@@ -888,6 +889,25 @@ export const TradingPanel = () => {
             </p>
           </div>
 
+          {/* 채널 돌파 상태 (거래 탭) */}
+          {channelBreakout !== null && (
+            <div className={`p-3 rounded-lg border ${
+              channelBreakout === 'upper' ? 'bg-red-900/30 border-red-500' : 'bg-yellow-900/30 border-yellow-500'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⚠️</span>
+                <div>
+                  <div className="font-semibold text-sm text-white">
+                    채널 {channelBreakout === 'upper' ? '상단' : '하단'} 돌파
+                  </div>
+                  <div className="text-xs text-gray-300 mt-1">
+                    자동 거래가 중지되었습니다. 헤더의 "고점 연결" 버튼으로 채널을 재설정하세요.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 진입점 정보 */}
           {highChannelEntryPoints.longEntry && highChannelEntryPoints.shortEntry && (
             <div className="border border-gray-600 rounded p-3 space-y-2">
@@ -1181,6 +1201,25 @@ export const TradingPanel = () => {
                   </div>
                 </div>
               </div>
+
+              {/* 채널 돌파 상태 */}
+              {channelBreakout !== null && (
+                <div className={`p-3 rounded-lg border ${
+                  channelBreakout === 'upper' ? 'bg-red-900/30 border-red-500' : 'bg-yellow-900/30 border-yellow-500'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚠️</span>
+                    <div>
+                      <div className="font-semibold text-sm text-white">
+                        채널 {channelBreakout === 'upper' ? '상단' : '하단'} 돌파
+                      </div>
+                      <div className="text-xs text-gray-300 mt-1">
+                        채널을 재설정하여 돌파 상태를 초기화하세요
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 추천 진입점 */}
               {recommendedEntries.length > 0 && (

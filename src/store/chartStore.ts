@@ -782,6 +782,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
     // 채널 재계산
     setTimeout(() => {
       get().recalculateChannels();
+      // 채널 재계산 후 돌파 상태 확인
+      setTimeout(() => {
+        get().checkChannelBreakout();
+      }, 100);
     }, 50);
   },
 
