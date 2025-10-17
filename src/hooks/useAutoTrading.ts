@@ -40,7 +40,6 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
   const lastCandleTimeRef = useRef<number | null>(null);
   const isInitializedRef = useRef(false);
   const scheduledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const checkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 비율 기반 수량 계산
   const calculateQuantityFromPercentage = (currentPrice: number, balance?: number): number => {
@@ -387,7 +386,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
 
     // 새로운 캔들 생성 감지 (1시간 정각)
     if (lastCandleTimeRef.current !== null && currentTime > lastCandleTimeRef.current) {
-      console.log('새로운 캔들 감지! 10분 후 자동 거래 실행 예약...');
+      console.log('새로운 캔들 감지! 5분 후 자동 거래 실행 예약...');
       console.log('이전 시간:', new Date(lastCandleTimeRef.current * 1000).toLocaleString());
       console.log('현재 시간:', new Date(currentTime * 1000).toLocaleString());
 
@@ -411,25 +410,6 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         }, delayMinutes * 60 * 1000); // 5분 = 300초 = 300000ms
       }
     }
-    // 캔들 생성이 아니어도 주문 내역이 없으면 자동 거래 실행
-    else if (config.enabled && !hasOrdersForCurrentCandle()) {
-      // 이미 타이머가 실행 중이면 새로운 타이머를 설정하지 않음
-      if (checkTimerRef.current) {
-        console.log('⏳ 자동 거래 타이머가 이미 실행 중입니다.');
-        return;
-      }
-
-      console.log('🔔 현재 캔들 기준 주문 내역 없음 - 5초 후 자동 거래 실행 예약');
-      checkTimerRef.current = setTimeout(() => {
-        console.log('⏰ 5초 타이머 완료 - 주문 내역 재확인 후 자동 거래 실행');
-        if (!hasOrdersForCurrentCandle()) {
-          executeAutoTrading();
-        } else {
-          console.log('⚠️ 재확인 결과 주문이 이미 존재함 - 자동 거래 스킵');
-        }
-        checkTimerRef.current = null;
-      }, 5000); // 5초 후 재확인 후 실행
-    }
 
     // cleanup: 컴포넌트 unmount 시 타이머 정리
     return () => {
@@ -444,10 +424,6 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       if (scheduledTimerRef.current) {
         clearTimeout(scheduledTimerRef.current);
         scheduledTimerRef.current = null;
-      }
-      if (checkTimerRef.current) {
-        clearTimeout(checkTimerRef.current);
-        checkTimerRef.current = null;
       }
     };
   }, []);
