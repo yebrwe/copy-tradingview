@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { TradingChart } from './components/Chart/TradingChart';
 import { Toolbar } from './components/Chart/Toolbar';
 import { TradingPanel } from './components/Trading/TradingPanel';
 import { OrderHistoryPanel } from './components/OrderHistory/OrderHistoryPanel';
+import { NotificationSettings } from './components/Settings/NotificationSettings';
 import { Toast } from './components/Toast/Toast';
 import { useBinanceWebSocket } from './hooks/useBinanceWebSocket';
 import { useChartStore } from './store/chartStore';
@@ -11,6 +13,7 @@ function App() {
   useBinanceWebSocket();
 
   const { symbol, highChannelEntryPoints, lowChannelEntryPoints, channelPattern } = useChartStore();
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
@@ -18,7 +21,16 @@ function App() {
       <div className="max-w-[1600px] mx-auto">
         {/* 헤더 */}
         <div className="mb-4">
-          <h1 className="text-3xl font-bold mb-3">트레이딩뷰 차트 복제</h1>
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-3xl font-bold">트레이딩뷰 차트 복제</h1>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="px-3 py-1.5 bg-[#2a2e39] text-gray-400 rounded hover:bg-[#363a45] hover:text-white transition-colors text-sm flex items-center gap-2"
+            >
+              <span>⚙️</span>
+              <span>알림 설정</span>
+            </button>
+          </div>
 
           {/* 고정된 그리드 레이아웃 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-h-[80px]">
@@ -113,6 +125,21 @@ function App() {
             <TradingPanel />
           </div>
         </div>
+
+        {/* 알림 설정 모달 */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="max-w-2xl w-full relative">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="absolute -top-10 right-0 text-white hover:text-gray-300 text-2xl"
+              >
+                ✕
+              </button>
+              <NotificationSettings />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

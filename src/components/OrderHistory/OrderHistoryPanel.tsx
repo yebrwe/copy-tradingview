@@ -228,69 +228,56 @@ export const OrderHistoryPanel = () => {
       </div>
 
       {/* 탭 콘텐츠 */}
-      <div className="p-3 space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar">
+      <div className="p-2 max-h-[280px] overflow-y-auto custom-scrollbar">
         {/* 포지션 탭 */}
         {activeTab === 'positions' && (
           <>
             {currentSymbolPositions.length > 0 ? (
-              currentSymbolPositions.map((position, index) => {
-                const isLong = position.positionAmt > 0;
-                const pnlPercent = position.entryPrice > 0
-                  ? ((position.unrealizedProfit / (position.entryPrice * Math.abs(position.positionAmt))) * 100)
-                  : 0;
+              <div className="space-y-1">
+                {currentSymbolPositions.map((position, index) => {
+                  const isLong = position.positionAmt > 0;
+                  const pnlPercent = position.entryPrice > 0
+                    ? ((position.unrealizedProfit / (position.entryPrice * Math.abs(position.positionAmt))) * 100)
+                    : 0;
+                  const markPrice = position.entryPrice + (position.unrealizedProfit / Math.abs(position.positionAmt));
 
-                return (
-                  <div
-                    key={index}
-                    className="bg-[#131722] rounded-lg p-3 border border-[#2a2e39] hover:border-[#363a45] transition-all"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {isLong ? 'LONG' : 'SHORT'}
+                  return (
+                    <div
+                      key={index}
+                      className="bg-[#131722] rounded px-2 py-1.5 border border-[#2a2e39] hover:border-[#363a45] transition-all"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded font-bold ${
+                            isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {isLong ? 'L' : 'S'}
+                          </span>
+                          <span className="text-gray-400">{position.leverage}x</span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-white">수량 {Math.abs(position.positionAmt).toFixed(3)}</span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-gray-400">진입 ${position.entryPrice.toFixed(2)}</span>
+                          <span className="text-gray-500">|</span>
+                          <span className={position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'}>
+                            마크 ${markPrice.toFixed(2)}
+                          </span>
                         </div>
-                        <div className="text-white font-semibold text-sm">{position.symbol}</div>
-                        <div className="px-1.5 py-0.5 bg-[#2a2e39] rounded text-xs text-gray-400">
-                          {position.leverage}x
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`text-sm font-bold ${position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {position.unrealizedProfit >= 0 ? '+' : ''}{position.unrealizedProfit.toFixed(2)} USDT
-                        </div>
-                        <div className={`text-xs ${pnlPercent >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
-                          {pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                        <div className="text-right">
+                          <span className={`font-bold ${position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {position.unrealizedProfit >= 0 ? '+' : ''}{position.unrealizedProfit.toFixed(2)} USDT
+                          </span>
+                          <span className={`ml-1.5 ${pnlPercent >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
+                            ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
+                          </span>
                         </div>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-3 gap-3 text-xs">
-                      <div>
-                        <div className="text-gray-500 mb-0.5">수량</div>
-                        <div className="text-white font-medium">{Math.abs(position.positionAmt).toFixed(4)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 mb-0.5">진입가</div>
-                        <div className="text-white font-medium">${position.entryPrice.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 mb-0.5">마크가</div>
-                        <div className={`font-medium ${
-                          isLong
-                            ? position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                            : position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          ${(position.entryPrice + (position.unrealizedProfit / Math.abs(position.positionAmt))).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             ) : (
-              <div className="text-center text-gray-500 text-sm py-12">
+              <div className="text-center text-gray-500 text-xs py-8">
                 보유 포지션이 없습니다
               </div>
             )}
@@ -301,52 +288,42 @@ export const OrderHistoryPanel = () => {
         {activeTab === 'openOrders' && (
           <>
             {currentSymbolOrders.length > 0 ? (
-              currentSymbolOrders.map((order) => {
-                const isLong = order.side === 'BUY';
-                const price = Number(order.price || order.stopPrice || 0);
+              <div className="space-y-1">
+                {currentSymbolOrders.map((order) => {
+                  const isLong = order.side === 'BUY';
+                  const price = Number(order.price || order.stopPrice || 0);
 
-                return (
-                  <div
-                    key={order.orderId}
-                    className="bg-[#131722] rounded-lg p-3 border border-[#2a2e39] hover:border-[#363a45] transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={`px-2 py-0.5 rounded text-xs font-bold ${
+                  return (
+                    <div
+                      key={order.orderId}
+                      className="bg-[#131722] rounded px-2 py-1.5 border border-[#2a2e39] hover:border-[#363a45] transition-all"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded font-bold ${
                             isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                           }`}>
-                            {isLong ? 'LONG' : 'SHORT'}
-                          </div>
-                          <div className="px-1.5 py-0.5 bg-[#2a2e39] rounded text-xs text-gray-400">
-                            {order.type}
-                          </div>
+                            {isLong ? 'L' : 'S'}
+                          </span>
+                          <span className="text-gray-400">{order.type}</span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-white">${price.toFixed(2)}</span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-gray-400">수량 {Number(order.origQty).toFixed(3)}</span>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div>
-                            <div className="text-gray-500 mb-0.5">가격</div>
-                            <div className="text-white font-semibold">${Number(price).toFixed(2)}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-500 mb-0.5">수량</div>
-                            <div className="text-white font-medium">{Number(order.origQty).toFixed(4)}</div>
-                          </div>
-                        </div>
+                        <button
+                          onClick={() => handleCancelOrder(order.orderId)}
+                          className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors"
+                        >
+                          취소
+                        </button>
                       </div>
-
-                      <button
-                        onClick={() => handleCancelOrder(order.orderId)}
-                        className="ml-3 px-3 py-1.5 bg-red-500/20 text-red-400 text-xs font-medium rounded hover:bg-red-500/30 transition-colors"
-                      >
-                        취소
-                      </button>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             ) : (
-              <div className="text-center text-gray-500 text-sm py-12">
+              <div className="text-center text-gray-500 text-xs py-8">
                 미체결 주문이 없습니다
               </div>
             )}
@@ -357,72 +334,49 @@ export const OrderHistoryPanel = () => {
         {activeTab === 'history' && (
           <>
             {orderPairs.length > 0 ? (
-              orderPairs.slice(0, 20).map((pair) => {
-                const isLong = pair.entryOrder.side === 'BUY';
+              <div className="space-y-1">
+                {orderPairs.slice(0, 20).map((pair) => {
+                  const isLong = pair.entryOrder.side === 'BUY';
 
-                return (
-                  <div
-                    key={pair.pairId}
-                    className="bg-[#131722] rounded-lg p-3 border border-[#2a2e39]"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {isLong ? 'LONG' : 'SHORT'}
-                      </div>
-                      {pair.entryOrder.isAutoTrading && (
-                        <div className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
-                          AUTO
+                  return (
+                    <div
+                      key={pair.pairId}
+                      className="bg-[#131722] rounded px-2 py-1.5 border border-[#2a2e39]"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded font-bold ${
+                            isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {isLong ? 'L' : 'S'}
+                          </span>
+                          {pair.entryOrder.isAutoTrading && (
+                            <span className="px-1 py-0.5 bg-blue-500/20 text-blue-400 rounded font-medium">
+                              A
+                            </span>
+                          )}
+                          <span className="text-white">진입 ${pair.entryOrder.price?.toFixed(2)}</span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-orange-400">
+                            SL {pair.stopLossOrder ? `$${pair.stopLossOrder.stopPrice?.toFixed(2)}` : '-'}
+                          </span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-green-400">
+                            TP {pair.takeProfitOrder ? `$${pair.takeProfitOrder.takeProfitPrice?.toFixed(2)}` : '-'}
+                          </span>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-gray-400">수량 {pair.entryOrder.quantity.toFixed(3)}</span>
                         </div>
-                      )}
-                      <div className="text-gray-500 text-xs ml-auto">
-                        {new Date(pair.timestamp).toLocaleTimeString()}
+                        <span className="text-gray-500">
+                          {new Date(pair.timestamp).toLocaleTimeString()}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-4 gap-2 text-xs">
-                      <div>
-                        <div className="text-gray-500 mb-0.5">진입</div>
-                        <div className="text-white font-semibold">
-                          ${pair.entryOrder.price?.toFixed(2)}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-gray-500 mb-0.5">SL</div>
-                        {pair.stopLossOrder ? (
-                          <div className="text-orange-400 font-semibold">
-                            ${pair.stopLossOrder.stopPrice?.toFixed(2)}
-                          </div>
-                        ) : (
-                          <div className="text-gray-600">-</div>
-                        )}
-                      </div>
-
-                      <div>
-                        <div className="text-gray-500 mb-0.5">TP</div>
-                        {pair.takeProfitOrder ? (
-                          <div className="text-green-400 font-semibold">
-                            ${pair.takeProfitOrder.takeProfitPrice?.toFixed(2)}
-                          </div>
-                        ) : (
-                          <div className="text-gray-600">-</div>
-                        )}
-                      </div>
-
-                      <div>
-                        <div className="text-gray-500 mb-0.5">수량</div>
-                        <div className="text-white font-medium">
-                          {pair.entryOrder.quantity.toFixed(4)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             ) : (
-              <div className="text-center text-gray-500 text-sm py-12">
+              <div className="text-center text-gray-500 text-xs py-8">
                 주문 내역이 없습니다
               </div>
             )}

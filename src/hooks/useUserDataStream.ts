@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BinanceFuturesAPI } from '../services/binanceFuturesAPI';
+import { notificationService } from '../services/notificationService';
 
 const BINANCE_WS_BASE_URL = 'wss://fstream.binance.com';
 
@@ -155,6 +156,20 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
                 console.log(`주문 ${orderUpdate.X} 감지 - 잔고 갱신`);
                 onBalanceUpdate();
               }
+            }
+
+            // 완전 체결 시 알림 전송
+            if (orderUpdate.X === 'FILLED') {
+              console.log('🔔 주문 체결 알림 전송');
+              notificationService.notifyOrderFilled({
+                symbol: orderUpdate.s,
+                side: orderUpdate.S,
+                type: orderUpdate.o,
+                price: parseFloat(orderUpdate.ap || orderUpdate.p), // 평균 체결가 또는 주문가
+                quantity: parseFloat(orderUpdate.q),
+                status: orderUpdate.X,
+                timestamp: data.E,
+              });
             }
           }
         } catch (error) {
