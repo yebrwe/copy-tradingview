@@ -32,7 +32,7 @@ export const useBinanceWebSocket = () => {
     const loadHistoricalData = async () => {
       try {
         console.log(`Loading historical data for ${symbol} ${timeFrame}...`);
-        const { candlesticks, volumes } = await BinanceAPI.getKlines(symbol, timeFrame, 500);
+        const { candlesticks, volumes } = await BinanceAPI.getKlines(symbol, timeFrame, 1000);
 
         if (isMounted) {
           setCandlestickData(candlesticks);

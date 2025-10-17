@@ -847,10 +847,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
       const currentPrice = candlestickData[candlestickData.length - 1].close;
 
-      // 이평선 위/아래 관계없이 항상 고점 채널 생성
-      // - 이평선 위: ATH + 왼쪽 고점 연결 → 최저점 평행이동
-      // - 이평선 아래: 기존 알고리즘 (15일 고점 연결)
-      get().connectMajorPeaks();
+      console.log('MA200 기반 패턴 판단 (재계산):', {
+        currentPrice,
+        ma200,
+        pattern: currentPrice > ma200 ? 'ascending' : 'descending'
+      });
+
+      // 패턴에 따라 해당 채널만 생성
+      if (currentPrice > ma200) {
+        // 상승 추세 (MA200 위) → 저점 채널만 생성
+        console.log('상승 추세 감지: 저점 채널만 생성');
+        get().connectMajorLows();
+      } else {
+        // 하락 추세 (MA200 아래) → 고점 채널만 생성
+        console.log('하락 추세 감지: 고점 채널만 생성');
+        get().connectMajorPeaks();
+      }
     }, 100);
   },
 }));

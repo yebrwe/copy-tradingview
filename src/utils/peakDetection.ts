@@ -307,17 +307,17 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
   const currentIndex = candles.length - 1;
   const lookback = 5;
 
-  // 1단계: 15일 범위에서 절대 최저점 찾기 (종가 기준)
+  // 1단계: 15일 범위에서 절대 최저점 찾기 (저가 기준)
   let absoluteLowest: Peak | null = null;
   let minPrice = Infinity;
 
   for (let i = fifteenDayStart; i < candles.length; i++) {
-    if (candles[i].close < minPrice) {
-      minPrice = candles[i].close;
+    if (candles[i].low < minPrice) {
+      minPrice = candles[i].low;
       absoluteLowest = {
         index: i,
         time: candles[i].time,
-        price: candles[i].close,
+        price: candles[i].low,
       };
     }
   }
@@ -329,7 +329,7 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
 
   console.log('15일 범위 절대 최저점:', absoluteLowest);
 
-  // 2단계: 최저점 이후부터 현재까지 범위에서 확정된 저점들만 찾기 (종가 기준)
+  // 2단계: 최저점 이후부터 현재까지 범위에서 확정된 저점들만 찾기 (저가 기준)
   const lowsAfterLowest: Peak[] = [];
   const searchStart = absoluteLowest.index + 1;
 
@@ -338,13 +338,13 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
 
   // 15일 최저점 이후부터 현재 캔들 직전까지 검색
   for (let i = searchStart; i < searchEnd; i++) {
-    const currentClose = candles[i].close;
+    const currentLow = candles[i].low;
     let isLow = true;
 
     // 좌측 lookback 범위 확인
     const leftStart = Math.max(0, i - lookback);
     for (let j = leftStart; j < i; j++) {
-      if (candles[j].close < currentClose) {
+      if (candles[j].low < currentLow) {
         isLow = false;
         break;
       }
@@ -354,7 +354,7 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
     if (isLow) {
       const rightEnd = Math.min(searchEnd - 1, i + lookback);
       for (let j = i + 1; j <= rightEnd; j++) {
-        if (candles[j].close < currentClose) {
+        if (candles[j].low < currentLow) {
           isLow = false;
           break;
         }
@@ -365,7 +365,7 @@ export function findMajorLows(candles: CandlestickData[]): Peak[] {
       lowsAfterLowest.push({
         index: i,
         time: candles[i].time,
-        price: currentClose,
+        price: currentLow,
       });
     }
   }
