@@ -14,6 +14,7 @@ export const TradingChart = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRestoringRange = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
+  const animationTimeRef = useRef(0);
 
   const { candlestickData, ma200Data, drawings, highChannelEntryPoints, lowChannelEntryPoints, recommendedEntries, channelPattern } = useChartStore();
 
@@ -141,8 +142,6 @@ export const TradingChart = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animationTime = 0;
-
     const drawDrawings = () => {
       const chartWidth = chartContainerRef.current?.clientWidth || 0;
       const chartHeight = 600;
@@ -206,8 +205,8 @@ export const TradingChart = () => {
             );
           };
 
-          // 깜빡이는 효과를 위한 opacity 계산 (0.3 ~ 1.0 사이에서 변화)
-          const blinkOpacity = 0.5 + Math.abs(Math.sin(animationTime * 0.003)) * 0.5;
+          // 깜빡이는 효과를 위한 opacity 계산 (0.5 ~ 1.0 사이에서 변화)
+          const blinkOpacity = 0.5 + Math.abs(Math.sin(animationTimeRef.current * 0.003)) * 0.5;
 
           // 고점 채널 진입점 마커 (하락 추세일 때만 표시)
           if (channelPattern === 'descending' && highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
@@ -278,7 +277,7 @@ export const TradingChart = () => {
 
     // 애니메이션 루프
     const animate = () => {
-      animationTime += 16; // ~60fps
+      animationTimeRef.current += 16; // ~60fps
       drawDrawings();
       animationFrameRef.current = requestAnimationFrame(animate);
     };
