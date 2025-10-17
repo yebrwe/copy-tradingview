@@ -158,18 +158,55 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
               }
             }
 
-            // 완전 체결 시 알림 전송
+            // 완전 체결 시 알림 전송 (진입/청산 구분)
             if (orderUpdate.X === 'FILLED') {
-              console.log('🔔 주문 체결 알림 전송');
-              notificationService.notifyOrderFilled({
-                symbol: orderUpdate.s,
-                side: orderUpdate.S,
-                type: orderUpdate.o,
-                price: parseFloat(orderUpdate.ap || orderUpdate.p), // 평균 체결가 또는 주문가
-                quantity: parseFloat(orderUpdate.q),
-                status: orderUpdate.X,
-                timestamp: data.E,
-              });
+              const orderType = orderUpdate.o; // LIMIT, MARKET, STOP_MARKET, TAKE_PROFIT_MARKET 등
+
+              // 진입 주문 체결 (LIMIT, MARKET)
+              if (orderType === 'LIMIT' || orderType === 'MARKET') {
+                console.log('🔔 포지션 진입 알림 전송');
+                notificationService.notifyPositionOpened({
+                  symbol: orderUpdate.s,
+                  side: orderUpdate.S === 'BUY' ? 'LONG' : 'SHORT',
+                  entryPrice: parseFloat(orderUpdate.ap || orderUpdate.p),
+                  quantity: parseFloat(orderUpdate.q),
+                  leverage: 1, // WebSocket에서는 레버리지 정보가 없음 (기본값)
+                  timestamp: data.E,
+                });
+              }
+              // 손절 체결 (STOP_MARKET)
+              else if (orderType === 'STOP_MARKET') {
+                console.log('🔔 손절 청산 알림 전송');
+                notificationService.notifyPositionClosed(
+                  orderUpdate.s,
+                  0, // 실제 PNL은 계산 필요 (여기서는 0으로)
+                  0, // 실제 PNL%는 계산 필요
+                  'stop_loss'
+                );
+              }
+              // 익절 체결 (TAKE_PROFIT_MARKET)
+              else if (orderType === 'TAKE_PROFIT_MARKET') {
+                console.log('🔔 익절 청산 알림 전송');
+                notificationService.notifyPositionClosed(
+                  orderUpdate.s,
+                  0, // 실제 PNL은 계산 필요 (여기서는 0으로)
+                  0, // 실제 PNL%는 계산 필요
+                  'take_profit'
+                );
+              }
+              // 기타 주문 타입
+              else {
+                console.log('🔔 주문 체결 알림 전송');
+                notificationService.notifyOrderFilled({
+                  symbol: orderUpdate.s,
+                  side: orderUpdate.S,
+                  type: orderUpdate.o,
+                  price: parseFloat(orderUpdate.ap || orderUpdate.p),
+                  quantity: parseFloat(orderUpdate.q),
+                  status: orderUpdate.X,
+                  timestamp: data.E,
+                });
+              }
             }
           }
         } catch (error) {

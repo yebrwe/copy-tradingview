@@ -150,17 +150,29 @@ class NotificationService {
   /**
    * 포지션 청산 알림 전송
    */
-  async notifyPositionClosed(symbol: string, pnl: number, pnlPercent: number) {
+  async notifyPositionClosed(symbol: string, pnl: number, pnlPercent: number, type?: 'stop_loss' | 'take_profit') {
     if (!this.isInitialized) {
       console.warn('알림 서비스가 초기화되지 않았습니다.');
       return;
     }
 
-    const pnlEmoji = pnl >= 0 ? '✅' : '❌';
-    const title = `${pnlEmoji} 포지션 청산`;
+    let emoji = '🔔';
+    let typeLabel = '포지션 청산';
+
+    if (type === 'stop_loss') {
+      emoji = '🛑';
+      typeLabel = '손절 청산';
+    } else if (type === 'take_profit') {
+      emoji = '✅';
+      typeLabel = '익절 청산';
+    } else {
+      emoji = pnl >= 0 ? '✅' : '❌';
+    }
+
+    const title = `${emoji} ${typeLabel}`;
     const message = [
       `${symbol}`,
-      `손익: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT (${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`,
+      pnl !== 0 ? `손익: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT (${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)` : '체결 완료',
       `시간: ${new Date().toLocaleString('ko-KR')}`,
     ].join('\n');
 
