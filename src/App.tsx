@@ -21,16 +21,7 @@ function App() {
       <div className="max-w-[1600px] mx-auto">
         {/* 헤더 */}
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-3xl font-bold">트레이딩뷰 차트 복제</h1>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="px-3 py-1.5 bg-[#2a2e39] text-gray-400 rounded hover:bg-[#363a45] hover:text-white transition-colors text-sm flex items-center gap-2"
-            >
-              <span>⚙️</span>
-              <span>알림 설정</span>
-            </button>
-          </div>
+          <h1 className="text-3xl font-bold mb-3">트레이딩뷰 차트 복제</h1>
 
           {/* 고정된 그리드 레이아웃 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-h-[80px]">
@@ -106,7 +97,7 @@ function App() {
 
         {/* 툴바 */}
         <div className="mb-4">
-          <Toolbar />
+          <Toolbar onSettingsClick={() => setShowSettings(true)} />
         </div>
 
         {/* 차트 및 거래 영역 */}

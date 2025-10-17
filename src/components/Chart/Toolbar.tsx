@@ -1,6 +1,10 @@
 import { useChartStore } from '../../store/chartStore';
 
-export const Toolbar = () => {
+interface ToolbarProps {
+  onSettingsClick?: () => void;
+}
+
+export const Toolbar = ({ onSettingsClick }: ToolbarProps) => {
   const { connectMajorPeaks, connectMajorLows, channelPattern } = useChartStore();
 
   const patternLabels: Record<string, { label: string; color: string }> = {
@@ -42,6 +46,20 @@ export const Toolbar = () => {
           {currentPattern.label}
         </span>
       </div>
+
+      {/* 오른쪽 정렬 */}
+      <div className="flex-1" />
+
+      {/* 알림 설정 버튼 */}
+      {onSettingsClick && (
+        <button
+          onClick={onSettingsClick}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition flex items-center gap-2"
+        >
+          <span>🔔</span>
+          <span>알림 설정</span>
+        </button>
+      )}
     </div>
   );
 };
