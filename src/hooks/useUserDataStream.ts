@@ -34,11 +34,22 @@ interface UserDataStreamHook {
   error: string | null;
 }
 
+interface UserDataStreamOptions {
+  enabled: boolean;
+  onBalanceUpdate?: () => void;
+}
+
 /**
  * 바이낸스 User Data Stream Hook
  * 실시간으로 포지션 및 주문 정보를 WebSocket으로 수신
  */
-export const useUserDataStream = (enabled: boolean): UserDataStreamHook => {
+export const useUserDataStream = (options: UserDataStreamOptions | boolean): UserDataStreamHook => {
+  // 하위 호환성: boolean 입력도 지원
+  const config = typeof options === 'boolean'
+    ? { enabled: options, onBalanceUpdate: undefined }
+    : options;
+
+  const { enabled, onBalanceUpdate } = config;
   const [positions, setPositions] = useState<Position[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -159,9 +170,21 @@ export const useUserDataStream = (enabled: boolean): UserDataStreamHook => {
                   return [...prev, updatedOrder];
                 }
               });
+
+              // 부분 체결 시 잔고 갱신
+              if (orderUpdate.X === 'PARTIALLY_FILLED' && onBalanceUpdate) {
+                console.log('부분 체결 감지 - 잔고 갱신');
+                onBalanceUpdate();
+              }
             } else if (orderUpdate.X === 'FILLED' || orderUpdate.X === 'CANCELED' || orderUpdate.X === 'EXPIRED') {
               // 완전 체결, 취소, 만료 - 목록에서 제거
               setOrders(prev => prev.filter(o => o.orderId !== updatedOrder.orderId));
+
+              // 주문 상태 변경 시 잔고 갱신
+              if (onBalanceUpdate) {
+                console.log(`주문 ${orderUpdate.X} 감지 - 잔고 갱신`);
+                onBalanceUpdate();
+              }
             }
           }
         } catch (error) {

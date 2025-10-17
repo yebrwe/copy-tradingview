@@ -22,8 +22,17 @@ export const OrderHistoryPanel = () => {
   const [initialOrders, setInitialOrders] = useState<any[]>([]);
   const [hasFetchedInitialOrders, setHasFetchedInitialOrders] = useState(false);
 
+  // 잔고 갱신 이벤트 발생
+  const handleBalanceUpdate = () => {
+    console.log('주문 상태 변경 감지 - 잔고 갱신 이벤트 발생');
+    window.dispatchEvent(new CustomEvent('balance-update-required'));
+  };
+
   // WebSocket으로 실시간 포지션 및 미체결 주문 수신
-  const { positions, orders: openOrders, isConnected } = useUserDataStream(true);
+  const { positions, orders: openOrders, isConnected } = useUserDataStream({
+    enabled: true,
+    onBalanceUpdate: handleBalanceUpdate,
+  });
 
   useEffect(() => {
     loadFromStorage();

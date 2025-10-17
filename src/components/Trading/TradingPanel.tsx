@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BinanceFuturesAPI } from '../../services/binanceFuturesAPI';
 import { useChartStore } from '../../store/chartStore';
 import { useAutoTrading } from '../../hooks/useAutoTrading';
@@ -166,7 +166,7 @@ export const TradingPanel = () => {
   }, [isAutoTradingEnabled]); // isAutoTradingEnabled가 변경될 때만 실행
 
   // 잔고 조회
-  const fetchBalance = async () => {
+  const fetchBalance = useCallback(async () => {
     setIsLoadingBalance(true);
     try {
       const balances = await BinanceFuturesAPI.getAccountBalance();
@@ -181,7 +181,7 @@ export const TradingPanel = () => {
     } finally {
       setIsLoadingBalance(false);
     }
-  };
+  }, [showError]);
 
   // 레버리지 조회
   const fetchLeverage = async () => {
@@ -245,6 +245,22 @@ export const TradingPanel = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 초기 마운트 시에만 실행
+
+  // WebSocket 주문 상태 변경 시 잔고 갱신
+  useEffect(() => {
+    const handleBalanceUpdateEvent = () => {
+      if (isApiConfigured) {
+        console.log('잔고 갱신 이벤트 수신 - 잔고 재조회');
+        fetchBalance();
+      }
+    };
+
+    window.addEventListener('balance-update-required', handleBalanceUpdateEvent);
+
+    return () => {
+      window.removeEventListener('balance-update-required', handleBalanceUpdateEvent);
+    };
+  }, [isApiConfigured, fetchBalance]); // isApiConfigured와 fetchBalance 변경 시 리스너 재등록
 
   // API 자격 증명 설정
   const handleConfigureApi = async () => {
