@@ -400,15 +400,15 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         scheduledTimerRef.current = null;
       }
 
-      // 자동 거래 실행 (10분 지연 - 새로운 캔들이 충분히 형성된 후)
+      // 자동 거래 실행 (5분 지연 - 캔들 갱신 시간 고려)
       if (config.enabled) {
-        const delayMinutes = 10;
+        const delayMinutes = 5; // 5분 여유 (캔들 갱신 지연 고려)
         console.log(`${delayMinutes}분 후 자동 거래 실행 예정:`, new Date(Date.now() + delayMinutes * 60 * 1000).toLocaleString());
         scheduledTimerRef.current = setTimeout(() => {
           console.log('예약된 자동 거래 실행 시작');
           executeAutoTrading();
           scheduledTimerRef.current = null; // 타이머 실행 후 초기화
-        }, delayMinutes * 60 * 1000); // 10분 = 600초 = 600000ms
+        }, delayMinutes * 60 * 1000); // 5분 = 300초 = 300000ms
       }
     }
     // 캔들 생성이 아니어도 주문 내역이 없으면 자동 거래 실행
