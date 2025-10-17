@@ -164,9 +164,9 @@ export const OrderHistoryPanel = () => {
         <div className="flex gap-1">
           <button
             onClick={() => setActiveTab('positions')}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'positions'
-                ? 'bg-[#2962ff] text-white shadow-lg shadow-blue-500/20'
+                ? 'bg-blue-600 text-white'
                 : 'text-gray-400 hover:text-white hover:bg-[#2a2e39]'
             }`}
           >
@@ -179,9 +179,9 @@ export const OrderHistoryPanel = () => {
           </button>
           <button
             onClick={() => setActiveTab('openOrders')}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'openOrders'
-                ? 'bg-[#2962ff] text-white shadow-lg shadow-blue-500/20'
+                ? 'bg-blue-600 text-white'
                 : 'text-gray-400 hover:text-white hover:bg-[#2a2e39]'
             }`}
           >
@@ -194,9 +194,9 @@ export const OrderHistoryPanel = () => {
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'history'
-                ? 'bg-[#2962ff] text-white shadow-lg shadow-blue-500/20'
+                ? 'bg-blue-600 text-white'
                 : 'text-gray-400 hover:text-white hover:bg-[#2a2e39]'
             }`}
           >
@@ -213,13 +213,13 @@ export const OrderHistoryPanel = () => {
           {/* WebSocket 연결 상태 */}
           <div className={`flex items-center gap-1.5 text-xs ${isConnected ? 'text-green-400' : 'text-gray-500'}`}>
             <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-            <span>{isConnected ? 'Live' : 'Offline'}</span>
+            <span className="font-medium">{isConnected ? 'Live' : 'Offline'}</span>
           </div>
 
           {activeTab === 'history' && orderPairs.length > 0 && (
             <button
               onClick={clearHistory}
-              className="text-xs px-2.5 py-1 bg-[#2a2e39] text-gray-400 rounded hover:bg-[#363a45] hover:text-white transition-colors"
+              className="text-xs px-3 py-1 bg-[#2a2e39] text-gray-400 rounded-lg hover:bg-[#363a45] hover:text-white transition-colors font-medium"
             >
               전체삭제
             </button>

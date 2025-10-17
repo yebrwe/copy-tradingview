@@ -119,13 +119,13 @@ function App() {
 
         {/* 알림 설정 모달 */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="max-w-2xl w-full relative">
               <button
                 onClick={() => setShowSettings(false)}
-                className="absolute -top-10 right-0 text-white hover:text-gray-300 text-2xl"
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 text-2xl w-10 h-10 flex items-center justify-center"
               >
-                ✕
+                ×
               </button>
               <NotificationSettings />
             </div>

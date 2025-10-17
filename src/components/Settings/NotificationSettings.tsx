@@ -57,29 +57,29 @@ export const NotificationSettings = () => {
   };
 
   return (
-    <div className="bg-[#1e222d] rounded-lg p-4 border border-[#2a2e39]">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-white font-semibold">주문 체결 알림 설정</h3>
+    <div className="bg-[#1e222d] rounded-lg p-6 border border-[#2a2e39]">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-white font-bold text-lg">알림 설정</h3>
         <button
           onClick={() => setShowInstructions(!showInstructions)}
-          className="text-xs text-blue-400 hover:text-blue-300"
+          className="text-sm text-gray-400 hover:text-white font-medium"
         >
-          {showInstructions ? '설명 숨기기' : '설정 방법 보기'}
+          {showInstructions ? '접기' : '설정 방법'}
         </button>
       </div>
 
       {/* 설정 방법 안내 */}
       {showInstructions && (
-        <div className="mb-4 p-3 bg-[#131722] rounded text-xs text-gray-400 space-y-2">
+        <div className="mb-6 p-4 bg-[#131722] rounded-lg text-sm text-gray-300 space-y-4 border border-[#2a2e39]">
           <div>
-            <div className="text-blue-400 font-semibold mb-1">📱 Telegram 봇 설정 (추천)</div>
-            <ol className="list-decimal list-inside space-y-1 ml-2">
+            <div className="text-white font-semibold mb-2">Telegram 봇 설정 (권장)</div>
+            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-400">
               <li>Telegram에서 @BotFather 검색 후 대화 시작</li>
               <li>/newbot 명령어로 봇 생성 → 봇 토큰 받기</li>
               <li>생성한 봇과 대화 시작 (아무 메시지나 전송)</li>
               <li>
                 브라우저에서{' '}
-                <code className="text-blue-400">
+                <code className="text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
                   https://api.telegram.org/bot{'<YOUR_TOKEN>'}/getUpdates
                 </code>{' '}
                 접속
@@ -88,8 +88,8 @@ export const NotificationSettings = () => {
             </ol>
           </div>
           <div>
-            <div className="text-purple-400 font-semibold mb-1">💬 Discord 웹후크 설정</div>
-            <ol className="list-decimal list-inside space-y-1 ml-2">
+            <div className="text-white font-semibold mb-2">Discord 웹후크 설정</div>
+            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-400">
               <li>Discord 서버 설정 → 연동 → 웹후크</li>
               <li>새 웹후크 생성 후 웹후크 URL 복사</li>
             </ol>
@@ -97,45 +97,47 @@ export const NotificationSettings = () => {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Telegram 설정 */}
-        <div className="space-y-2">
-          <label className="text-sm text-gray-400 flex items-center gap-2">
-            <span>📱 Telegram Bot Token</span>
-            <span className="text-xs text-gray-500">(추천)</span>
-          </label>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-gray-300 font-medium">
+              Telegram Bot Token
+            </label>
+            <span className="text-xs text-blue-400 font-medium">권장</span>
+          </div>
           <input
             type="text"
             value={telegramBotToken}
             onChange={(e) => setTelegramBotToken(e.target.value)}
             placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-            className="w-full px-3 py-2 bg-[#131722] border border-[#2a2e39] rounded text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-2.5 bg-[#131722] border border-[#2a2e39] rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
 
-          <label className="text-sm text-gray-400">Chat ID</label>
+          <label className="text-sm text-gray-300 font-medium block">Chat ID</label>
           <input
             type="text"
             value={telegramChatId}
             onChange={(e) => setTelegramChatId(e.target.value)}
             placeholder="123456789"
-            className="w-full px-3 py-2 bg-[#131722] border border-[#2a2e39] rounded text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-2.5 bg-[#131722] border border-[#2a2e39] rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
         {/* Discord 설정 */}
-        <div className="space-y-2">
-          <label className="text-sm text-gray-400">💬 Discord Webhook URL</label>
+        <div className="space-y-3">
+          <label className="text-sm text-gray-300 font-medium block">Discord Webhook URL</label>
           <input
             type="text"
             value={discordWebhookUrl}
             onChange={(e) => setDiscordWebhookUrl(e.target.value)}
             placeholder="https://discord.com/api/webhooks/..."
-            className="w-full px-3 py-2 bg-[#131722] border border-[#2a2e39] rounded text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-2.5 bg-[#131722] border border-[#2a2e39] rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
         {/* 브라우저 알림 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <input
             type="checkbox"
             id="browser-notification"
@@ -143,35 +145,35 @@ export const NotificationSettings = () => {
             onChange={(e) => setBrowserNotification(e.target.checked)}
             className="w-4 h-4"
           />
-          <label htmlFor="browser-notification" className="text-sm text-gray-400">
-            🔔 브라우저 알림 (브라우저가 열려있을 때만)
+          <label htmlFor="browser-notification" className="text-sm text-gray-300">
+            브라우저 알림 사용 (브라우저가 열려있을 때만)
           </label>
         </div>
 
         {/* 버튼 */}
-        <div className="flex gap-2">
+        <div className="flex gap-3 pt-2">
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm font-medium"
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold"
           >
             저장
           </button>
           <button
             onClick={handleTest}
-            className="px-4 py-2 bg-[#2a2e39] text-gray-400 rounded hover:bg-[#363a45] hover:text-white transition-colors text-sm"
+            className="px-6 py-2.5 bg-[#2a2e39] text-gray-300 rounded-lg hover:bg-[#363a45] transition-colors text-sm font-medium"
           >
             테스트
           </button>
         </div>
 
         {/* 알림 예시 */}
-        <div className="mt-4 p-3 bg-[#131722] rounded border border-[#2a2e39]">
-          <div className="text-xs text-gray-500 mb-2">알림 예시:</div>
-          <div className="text-xs text-gray-400 space-y-1">
-            <div>🟢 <span className="text-white">주문 체결</span></div>
-            <div className="ml-4">ETHUSDT BUY LIMIT</div>
-            <div className="ml-4">가격: $2,450.00</div>
-            <div className="ml-4">수량: 0.5000</div>
+        <div className="mt-2 p-4 bg-[#131722] rounded-lg border border-[#2a2e39]">
+          <div className="text-xs text-gray-500 font-medium mb-2">알림 예시</div>
+          <div className="text-xs text-gray-300 space-y-1">
+            <div className="font-semibold text-white">포지션 진입</div>
+            <div className="ml-3 text-gray-400">ETHUSDT LONG</div>
+            <div className="ml-3 text-gray-400">진입가: $2,450.00</div>
+            <div className="ml-3 text-gray-400">수량: 0.5000</div>
           </div>
         </div>
       </div>
