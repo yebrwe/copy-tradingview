@@ -217,22 +217,6 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
         const side = entry.type === 'long' ? 'BUY' : 'SELL';
         const oppositeSide = entry.type === 'long' ? 'SELL' : 'BUY';
 
-        // 현재 가격 가져오기 (최신 캔들의 종가)
-        const { candlestickData } = useChartStore.getState();
-        const currentPrice = candlestickData[candlestickData.length - 1].close;
-
-        // 진입점 유효성 검증
-        const isEntryValid = entry.type === 'long'
-          ? currentPrice < entryPrice  // Long: 현재 가격이 진입점보다 낮아야 함
-          : currentPrice > entryPrice; // Short: 현재 가격이 진입점보다 높아야 함
-
-        if (!isEntryValid) {
-          console.log(`[${entry.type.toUpperCase()} ${entry.channel.toUpperCase()}] 진입점 무효 - 스킵`);
-          console.log(`  현재가: ${currentPrice.toFixed(2)}, 진입점: ${entryPrice.toFixed(2)}`);
-          console.log(`  사유: 현재 가격이 이미 진입점을 지나쳤습니다.`);
-          continue; // 이 진입점은 건너뛰고 다음으로
-        }
-
         // 스탑로스 & 테이크프로핏 계산
         const stopLoss = config.useStopLoss
           ? (entry.type === 'long'

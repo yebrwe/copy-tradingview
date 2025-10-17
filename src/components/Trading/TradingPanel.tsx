@@ -41,7 +41,6 @@ export const TradingPanel = () => {
     channelPattern,
     recommendedEntries,
     channelBreakout,
-    candlestickData,
   } = useChartStore();
   const { showSuccess, showError, showWarning } = useToastStore();
   const { addOrder } = useOrderHistoryStore();
@@ -294,22 +293,6 @@ export const TradingPanel = () => {
     setIsTrading(true);
     try {
       const entryPrice = highChannelEntryPoints.longEntry;
-
-      // 현재 가격 가져오기 (최신 캔들의 종가)
-      if (candlestickData.length === 0) {
-        showWarning('차트 데이터가 로드되지 않았습니다.');
-        return;
-      }
-      const currentPrice = candlestickData[candlestickData.length - 1].close;
-
-      // 진입점 유효성 검증 (Long: 현재 가격이 진입점보다 낮아야 함)
-      if (currentPrice >= entryPrice) {
-        showWarning(
-          `진입 불가: 현재가($${currentPrice.toFixed(2)})가 롱 진입점($${entryPrice.toFixed(2)})보다 높거나 같습니다. 가격이 하락할 때까지 대기하세요.`
-        );
-        return;
-      }
-
       const qty = calculateQuantityFromPercentage(entryPrice);
       const stopLoss = useStopLoss
         ? entryPrice * (1 - parseFloat(stopLossOffset) / 100)
@@ -505,22 +488,6 @@ export const TradingPanel = () => {
     setIsTrading(true);
     try {
       const entryPrice = highChannelEntryPoints.shortEntry;
-
-      // 현재 가격 가져오기 (최신 캔들의 종가)
-      if (candlestickData.length === 0) {
-        showWarning('차트 데이터가 로드되지 않았습니다.');
-        return;
-      }
-      const currentPrice = candlestickData[candlestickData.length - 1].close;
-
-      // 진입점 유효성 검증 (Short: 현재 가격이 진입점보다 높아야 함)
-      if (currentPrice <= entryPrice) {
-        showWarning(
-          `진입 불가: 현재가($${currentPrice.toFixed(2)})가 숏 진입점($${entryPrice.toFixed(2)})보다 낮거나 같습니다. 가격이 상승할 때까지 대기하세요.`
-        );
-        return;
-      }
-
       const qty = calculateQuantityFromPercentage(entryPrice);
       const stopLoss = useStopLoss
         ? entryPrice * (1 + parseFloat(stopLossOffset) / 100)
