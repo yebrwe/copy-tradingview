@@ -28,10 +28,23 @@ export const OrderHistoryPanel = () => {
     window.dispatchEvent(new CustomEvent('balance-update-required'));
   };
 
-  // WebSocket으로 실시간 포지션 및 미체결 주문 수신
-  const { positions, orders: openOrders, isConnected, removedOrderIds, clearRemovedOrderIds } = useUserDataStream({
+  // 주문 업데이트 이벤트 발생 (REST API 재조회)
+  const handleOrderUpdate = async () => {
+    console.log('주문 업데이트 감지 - REST API로 미체결 주문 재조회');
+    try {
+      const orders = await BinanceFuturesAPI.getOpenOrders(symbol);
+      console.log('REST API 재조회 결과:', orders.length, '건');
+      setInitialOrders(orders);
+    } catch (err: any) {
+      console.error('REST API 재조회 실패:', err);
+    }
+  };
+
+  // WebSocket으로 실시간 포지션 수신 및 주문 업데이트 트리거
+  const { positions, isConnected } = useUserDataStream({
     enabled: true,
     onBalanceUpdate: handleBalanceUpdate,
+    onOrderUpdate: handleOrderUpdate,
   });
 
   useEffect(() => {
@@ -67,21 +80,19 @@ export const OrderHistoryPanel = () => {
       const refreshOrders = async () => {
         try {
           console.log('WebSocket 연결 후 REST API 재조회...');
-          // REST API 재조회 전에 removedOrderIds 초기화
-          clearRemovedOrderIds();
           const orders = await BinanceFuturesAPI.getOpenOrders(symbol);
-          console.log('REST API 재조회 결과:', orders.length, '건', orders);
+          console.log('REST API 재조회 결과:', orders.length, '건');
           setInitialOrders(orders);
         } catch (err: any) {
           console.error('REST API 재조회 실패:', err);
         }
       };
 
-      // WebSocket 연결 후 2초 뒤 재조회 (WebSocket이 초기 데이터를 받을 시간을 줌)
-      const timer = setTimeout(refreshOrders, 2000);
+      // WebSocket 연결 후 1초 뒤 재조회
+      const timer = setTimeout(refreshOrders, 1000);
       return () => clearTimeout(timer);
     }
-  }, [isConnected, symbol, hasFetchedInitialOrders, clearRemovedOrderIds]);
+  }, [isConnected, symbol, hasFetchedInitialOrders]);
 
   // 심볼이 변경되면 초기 조회 플래그 리셋
   useEffect(() => {
@@ -136,37 +147,13 @@ export const OrderHistoryPanel = () => {
   // 현재 심볼의 포지션만 필터링
   const currentSymbolPositions = positions.filter(p => p.symbol === symbol);
 
-  // WebSocket 주문과 초기 조회 주문 병합 (orderId 기준 중복 제거)
-  // WebSocket 데이터를 우선시하되, WebSocket에 없는 주문은 initialOrders에서 추가
-  const uniqueOrdersMap = new Map<number, any>();
+  // REST API로 조회한 미체결 주문만 사용 (WebSocket은 트리거로만 사용)
+  const currentSymbolOrders = initialOrders
+    .filter(order => order.symbol === symbol)
+    .filter(order => order.status === 'NEW' || order.status === 'PARTIALLY_FILLED');
 
-  // 1. 먼저 initialOrders 추가 (REST API로 조회한 전체 미체결 주문)
-  // 단, WebSocket에서 제거된 주문은 제외
-  initialOrders.forEach(order => {
-    if (!removedOrderIds.has(order.orderId)) {
-      uniqueOrdersMap.set(order.orderId, order);
-    }
-  });
-
-  // 2. WebSocket 데이터로 덮어쓰기 (더 최신 데이터)
-  // WebSocket에서 받은 주문은 상태가 업데이트된 것이므로 우선순위가 높음
-  openOrders.forEach(order => {
-    uniqueOrdersMap.set(order.orderId, order);
-  });
-
-  // 3. 체결/취소된 주문은 제외 (status가 FILLED, CANCELED, EXPIRED인 경우)
-  const mergedOrders = Array.from(uniqueOrdersMap.values()).filter(order => {
-    // NEW나 PARTIALLY_FILLED 상태만 표시
-    return order.status === 'NEW' || order.status === 'PARTIALLY_FILLED';
-  });
-
-  const currentSymbolOrders = mergedOrders.filter(o => o.symbol === symbol);
-
-  console.log('미체결 주문 병합:', {
-    initialOrders: initialOrders.length,
-    openOrders: openOrders.length,
-    removedOrderIds: removedOrderIds.size,
-    merged: mergedOrders.length,
+  console.log('미체결 주문:', {
+    total: initialOrders.length,
     currentSymbol: currentSymbolOrders.length,
   });
 
