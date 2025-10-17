@@ -42,6 +42,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
   const isInitializedRef = useRef(false);
   const scheduledTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasCheckedInitialOrdersRef = useRef(false);
+  const previousEnabledRef = useRef(config.enabled);
 
   // 비율 기반 수량 계산
   const calculateQuantityFromPercentage = (currentPrice: number, balance?: number): number => {
@@ -115,23 +116,29 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       return;
     }
 
+    // 최신 상태를 store에서 직접 가져오기 (클로저 문제 해결)
+    const currentState = useChartStore.getState();
+    const currentRecommendedEntries = currentState.recommendedEntries;
+    const currentChannelBreakout = currentState.channelBreakout;
+    const currentChannelPattern = currentState.channelPattern;
+
     // 채널 돌파 상태 확인
-    if (channelBreakout !== null) {
-      console.log('🚫 채널 돌파 상태로 인해 자동 거래 중지:', channelBreakout === 'upper' ? '상단 돌파' : '하단 돌파');
+    if (currentChannelBreakout !== null) {
+      console.log('🚫 채널 돌파 상태로 인해 자동 거래 중지:', currentChannelBreakout === 'upper' ? '상단 돌파' : '하단 돌파');
       console.log('💡 채널을 재설정(고점 연결 버튼)하여 돌파 상태를 초기화하세요.');
       showError('채널이 돌파되어 자동 거래가 중지되었습니다. 채널을 재설정하세요.', '자동 거래');
       return;
     }
 
-    if (recommendedEntries.length === 0) {
+    if (currentRecommendedEntries.length === 0) {
       console.log('추천 진입점이 없습니다.');
       return;
     }
 
     console.log('=== 자동 거래 시작 ===');
     console.log('시간:', new Date().toLocaleString());
-    console.log('채널 패턴:', channelPattern);
-    console.log('추천 진입점:', recommendedEntries);
+    console.log('채널 패턴:', currentChannelPattern);
+    console.log('추천 진입점:', currentRecommendedEntries);
 
     try {
       // 1. 잔고 조회 (수량 계산에 사용)
@@ -162,7 +169,7 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       await BinanceFuturesAPI.cancelAllOpenOrders(symbol);
 
       // 4. 추천 진입점 기반 주문 생성
-      for (const [index, entry] of recommendedEntries.entries()) {
+      for (const [index, entry] of currentRecommendedEntries.entries()) {
         if (index > 0) {
           await delay(API_CALL_DELAY); // 주문 간 딜레이
         }
@@ -302,6 +309,19 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
     // 채널 돌파 상태 확인 (매 캔들 업데이트마다)
     checkChannelBreakout();
 
+    // config.enabled가 false → true로 변경되었는지 확인
+    const wasDisabled = !previousEnabledRef.current;
+    const isNowEnabled = config.enabled;
+    const justEnabled = wasDisabled && isNowEnabled;
+
+    // 토글이 켜졌을 때 초기 체크 리셋
+    if (justEnabled && isInitializedRef.current) {
+      console.log('🔔 자동 거래 토글 활성화 감지 - 초기 체크 리셋');
+      hasCheckedInitialOrdersRef.current = false;
+    }
+
+    previousEnabledRef.current = config.enabled;
+
     // 초기화 시 (첫 로드)
     if (!isInitializedRef.current) {
       lastCandleTimeRef.current = currentTime;
@@ -314,7 +334,29 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       if (config.enabled && !hasCheckedInitialOrdersRef.current) {
         hasCheckedInitialOrdersRef.current = true;
 
-        setTimeout(() => {
+        // 채널 계산이 완료될 때까지 대기 (최대 10초, 500ms 간격으로 체크)
+        const waitForRecommendedEntries = async () => {
+          const maxAttempts = 20; // 10초 (20 * 500ms)
+          let attempts = 0;
+
+          while (attempts < maxAttempts) {
+            const currentRecommendedEntries = useChartStore.getState().recommendedEntries;
+
+            if (currentRecommendedEntries.length > 0) {
+              console.log('✅ 추천 진입점 계산 완료:', currentRecommendedEntries.length, '개');
+              break;
+            }
+
+            console.log(`⏳ 추천 진입점 계산 대기 중... (${attempts + 1}/${maxAttempts})`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+          }
+
+          if (attempts >= maxAttempts) {
+            console.warn('⚠️ 추천 진입점 계산 시간 초과 (10초). 자동 거래를 건너뜁니다.');
+            return;
+          }
+
           // 최신 orders 상태를 가져오기 위해 store에서 직접 조회
           const currentOrders = useOrderHistoryStore.getState().orders;
 
@@ -343,10 +385,78 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
             console.log('기존 주문 수:', ordersInCurrentCandle.length);
             console.log('기존 주문:', ordersInCurrentCandle);
           }
-        }, 2000); // 2초 후 실행 (데이터 로드 후)
+        };
+
+        // 2초 후 시작 (데이터 로드 후)
+        setTimeout(() => {
+          waitForRecommendedEntries();
+        }, 2000);
       }
 
       return;
+    }
+
+    // 토글이 켜진 직후 또는 초기 체크가 필요한 경우
+    if (config.enabled && !hasCheckedInitialOrdersRef.current) {
+      hasCheckedInitialOrdersRef.current = true;
+
+      // 채널 계산이 완료될 때까지 대기 (최대 10초, 500ms 간격으로 체크)
+      const waitForRecommendedEntries = async () => {
+        const maxAttempts = 20; // 10초 (20 * 500ms)
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+          const currentRecommendedEntries = useChartStore.getState().recommendedEntries;
+
+          if (currentRecommendedEntries.length > 0) {
+            console.log('✅ 추천 진입점 계산 완료:', currentRecommendedEntries.length, '개');
+            break;
+          }
+
+          console.log(`⏳ 추천 진입점 계산 대기 중... (${attempts + 1}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+          attempts++;
+        }
+
+        if (attempts >= maxAttempts) {
+          console.warn('⚠️ 추천 진입점 계산 시간 초과 (10초). 자동 거래를 건너뜁니다.');
+          return;
+        }
+
+        // 최신 orders 상태를 가져오기 위해 store에서 직접 조회
+        const currentOrders = useOrderHistoryStore.getState().orders;
+
+        // 현재 캔들 시간대에 주문이 있는지 확인 (1시간봉 기준)
+        const candleStartTime = currentTime * 1000; // 초 → 밀리초
+        const candleEndTime = candleStartTime + 60 * 60 * 1000; // 1시간 후
+
+        // 현재 캔들 시간대의 자동 거래 주문 확인
+        const ordersInCurrentCandle = currentOrders.filter(order =>
+          order.isAutoTrading &&
+          order.timestamp >= candleStartTime &&
+          order.timestamp < candleEndTime &&
+          order.type === 'LIMIT' // 진입 주문만 확인
+        );
+
+        if (ordersInCurrentCandle.length === 0) {
+          console.log('📋 현재 캔들 시간대에 주문 없음 - 자동 거래 실행');
+          console.log('현재 캔들 시간:', new Date(candleStartTime).toLocaleString());
+          console.log('캔들 범위:', new Date(candleStartTime).toLocaleString(), '~', new Date(candleEndTime).toLocaleString());
+          console.log('전체 주문 수:', currentOrders.length);
+          executeAutoTrading();
+        } else {
+          console.log('✅ 현재 캔들 시간대에 이미 주문 존재 - 자동 거래 스킵');
+          console.log('현재 캔들 시간:', new Date(candleStartTime).toLocaleString());
+          console.log('캔들 범위:', new Date(candleStartTime).toLocaleString(), '~', new Date(candleEndTime).toLocaleString());
+          console.log('기존 주문 수:', ordersInCurrentCandle.length);
+          console.log('기존 주문:', ordersInCurrentCandle);
+        }
+      };
+
+      // 즉시 실행
+      setTimeout(() => {
+        waitForRecommendedEntries();
+      }, 100);
     }
 
     // 새로운 캔들 생성 감지 (1시간 정각)

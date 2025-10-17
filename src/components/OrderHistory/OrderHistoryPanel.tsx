@@ -1,5 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useOrderHistoryStore } from '../../store/orderHistoryStore';
+import { useChartStore } from '../../store/chartStore';
+import { useUserDataStream } from '../../hooks/useUserDataStream';
+import { BinanceFuturesAPI } from '../../services/binanceFuturesAPI';
 import type { OrderHistory } from '../../store/orderHistoryStore';
 
 interface OrderPair {
@@ -10,18 +13,62 @@ interface OrderPair {
   timestamp: number;
 }
 
+type TabType = 'positions' | 'openOrders' | 'history';
+
 export const OrderHistoryPanel = () => {
-  const { orders, loadFromStorage, clearHistory } = useOrderHistoryStore();
+  const { orders: historyOrders, loadFromStorage, clearHistory } = useOrderHistoryStore();
+  const { symbol } = useChartStore();
+  const [activeTab, setActiveTab] = useState<TabType>('positions');
+  const [initialOrders, setInitialOrders] = useState<any[]>([]);
+  const [hasFetchedInitialOrders, setHasFetchedInitialOrders] = useState(false);
+
+  // WebSocket으로 실시간 포지션 및 미체결 주문 수신
+  const { positions, orders: openOrders, isConnected } = useUserDataStream(true);
 
   useEffect(() => {
     loadFromStorage();
   }, [loadFromStorage]);
 
+  // 초기 미체결 주문 조회 (서버 재시작 또는 페이지 재진입 시)
+  useEffect(() => {
+    const fetchInitialOrders = async () => {
+      // 이미 조회했으면 스킵 (심볼 변경 시는 재조회)
+      if (hasFetchedInitialOrders) {
+        return;
+      }
+
+      try {
+        const orders = await BinanceFuturesAPI.getOpenOrders(symbol);
+        setInitialOrders(orders);
+        setHasFetchedInitialOrders(true);
+      } catch (err: any) {
+        // Silently handle errors
+      }
+    };
+
+    // 컴포넌트 마운트 시 또는 심볼 변경 시 조회
+    fetchInitialOrders();
+  }, [symbol, hasFetchedInitialOrders]);
+
+  // 심볼이 변경되면 초기 조회 플래그 리셋
+  useEffect(() => {
+    setHasFetchedInitialOrders(false);
+    setInitialOrders([]);
+  }, [symbol]);
+
+  const handleCancelOrder = async (orderId: number) => {
+    try {
+      await BinanceFuturesAPI.cancelOrder(symbol, orderId);
+    } catch (err: any) {
+      alert(`주문 취소 실패: ${err.message}`);
+    }
+  };
+
   // 주문을 pairId로 그룹핑
   const groupOrdersByPair = (): OrderPair[] => {
     const pairMap = new Map<string, { entry?: OrderHistory; stopLoss?: OrderHistory; takeProfit?: OrderHistory }>();
 
-    orders.forEach((order) => {
+    historyOrders.forEach((order) => {
       if (order.pairId) {
         const existing = pairMap.get(order.pairId) || {};
         if (order.type === 'LIMIT' || order.type === 'MARKET') {
@@ -48,108 +95,320 @@ export const OrderHistoryPanel = () => {
       }
     });
 
-    // 최신순으로 정렬
     return pairs.sort((a, b) => b.timestamp - a.timestamp);
   };
 
   const orderPairs = groupOrdersByPair();
 
+  // 현재 심볼의 포지션만 필터링
+  const currentSymbolPositions = positions.filter(p => p.symbol === symbol);
+
+  // WebSocket 주문과 초기 조회 주문 병합 (orderId 기준 중복 제거)
+  // WebSocket 데이터가 더 최신이므로 우선순위 부여
+  const uniqueOrdersMap = new Map();
+
+  // 먼저 초기 조회 주문을 추가
+  initialOrders.forEach(order => {
+    uniqueOrdersMap.set(order.orderId, order);
+  });
+
+  // WebSocket 주문으로 덮어쓰기 (더 최신 데이터)
+  openOrders.forEach(order => {
+    uniqueOrdersMap.set(order.orderId, order);
+  });
+
+  const mergedOrders = Array.from(uniqueOrdersMap.values());
+  const currentSymbolOrders = mergedOrders.filter(o => o.symbol === symbol);
+
   return (
-    <div className="bg-gray-800 p-4 rounded-lg">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold">주문 내역</h3>
-        {orders.length > 0 && (
+    <div className="bg-[#1e222d] rounded-lg overflow-hidden border border-[#2a2e39]">
+      {/* 탭 헤더 */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-[#2a2e39]">
+        <div className="flex gap-1">
           <button
-            onClick={clearHistory}
-            className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
+            onClick={() => setActiveTab('positions')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'positions'
+                ? 'bg-[#2962ff] text-white shadow-lg shadow-blue-500/20'
+                : 'text-gray-400 hover:text-white hover:bg-[#2a2e39]'
+            }`}
           >
-            전체 삭제
+            포지션
+            {currentSymbolPositions.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-white/20 rounded">
+                {currentSymbolPositions.length}
+              </span>
+            )}
           </button>
+          <button
+            onClick={() => setActiveTab('openOrders')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'openOrders'
+                ? 'bg-[#2962ff] text-white shadow-lg shadow-blue-500/20'
+                : 'text-gray-400 hover:text-white hover:bg-[#2a2e39]'
+            }`}
+          >
+            미체결
+            {currentSymbolOrders.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-white/20 rounded">
+                {currentSymbolOrders.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'history'
+                ? 'bg-[#2962ff] text-white shadow-lg shadow-blue-500/20'
+                : 'text-gray-400 hover:text-white hover:bg-[#2a2e39]'
+            }`}
+          >
+            내역
+            {orderPairs.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-white/20 rounded">
+                {orderPairs.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* WebSocket 연결 상태 */}
+          <div className={`flex items-center gap-1.5 text-xs ${isConnected ? 'text-green-400' : 'text-gray-500'}`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+            <span>{isConnected ? 'Live' : 'Offline'}</span>
+          </div>
+
+          {activeTab === 'history' && orderPairs.length > 0 && (
+            <button
+              onClick={clearHistory}
+              className="text-xs px-2.5 py-1 bg-[#2a2e39] text-gray-400 rounded hover:bg-[#363a45] hover:text-white transition-colors"
+            >
+              전체삭제
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 탭 콘텐츠 */}
+      <div className="p-3 space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar">
+        {/* 포지션 탭 */}
+        {activeTab === 'positions' && (
+          <>
+            {currentSymbolPositions.length > 0 ? (
+              currentSymbolPositions.map((position, index) => {
+                const isLong = position.positionAmt > 0;
+                const pnlPercent = position.entryPrice > 0
+                  ? ((position.unrealizedProfit / (position.entryPrice * Math.abs(position.positionAmt))) * 100)
+                  : 0;
+
+                return (
+                  <div
+                    key={index}
+                    className="bg-[#131722] rounded-lg p-3 border border-[#2a2e39] hover:border-[#363a45] transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {isLong ? 'LONG' : 'SHORT'}
+                        </div>
+                        <div className="text-white font-semibold text-sm">{position.symbol}</div>
+                        <div className="px-1.5 py-0.5 bg-[#2a2e39] rounded text-xs text-gray-400">
+                          {position.leverage}x
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-sm font-bold ${position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {position.unrealizedProfit >= 0 ? '+' : ''}{position.unrealizedProfit.toFixed(2)} USDT
+                        </div>
+                        <div className={`text-xs ${pnlPercent >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
+                          {pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <div className="text-gray-500 mb-0.5">수량</div>
+                        <div className="text-white font-medium">{Math.abs(position.positionAmt).toFixed(4)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 mb-0.5">진입가</div>
+                        <div className="text-white font-medium">${position.entryPrice.toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 mb-0.5">마크가</div>
+                        <div className={`font-medium ${
+                          isLong
+                            ? position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                            : position.unrealizedProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          ${(position.entryPrice + (position.unrealizedProfit / Math.abs(position.positionAmt))).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-gray-500 text-sm py-12">
+                보유 포지션이 없습니다
+              </div>
+            )}
+          </>
+        )}
+
+        {/* 미체결 주문 탭 */}
+        {activeTab === 'openOrders' && (
+          <>
+            {currentSymbolOrders.length > 0 ? (
+              currentSymbolOrders.map((order) => {
+                const isLong = order.side === 'BUY';
+                const price = Number(order.price || order.stopPrice || 0);
+
+                return (
+                  <div
+                    key={order.orderId}
+                    className="bg-[#131722] rounded-lg p-3 border border-[#2a2e39] hover:border-[#363a45] transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {isLong ? 'LONG' : 'SHORT'}
+                          </div>
+                          <div className="px-1.5 py-0.5 bg-[#2a2e39] rounded text-xs text-gray-400">
+                            {order.type}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <div className="text-gray-500 mb-0.5">가격</div>
+                            <div className="text-white font-semibold">${Number(price).toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500 mb-0.5">수량</div>
+                            <div className="text-white font-medium">{Number(order.origQty).toFixed(4)}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleCancelOrder(order.orderId)}
+                        className="ml-3 px-3 py-1.5 bg-red-500/20 text-red-400 text-xs font-medium rounded hover:bg-red-500/30 transition-colors"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-gray-500 text-sm py-12">
+                미체결 주문이 없습니다
+              </div>
+            )}
+          </>
+        )}
+
+        {/* 주문 내역 탭 */}
+        {activeTab === 'history' && (
+          <>
+            {orderPairs.length > 0 ? (
+              orderPairs.slice(0, 20).map((pair) => {
+                const isLong = pair.entryOrder.side === 'BUY';
+
+                return (
+                  <div
+                    key={pair.pairId}
+                    className="bg-[#131722] rounded-lg p-3 border border-[#2a2e39]"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {isLong ? 'LONG' : 'SHORT'}
+                      </div>
+                      {pair.entryOrder.isAutoTrading && (
+                        <div className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
+                          AUTO
+                        </div>
+                      )}
+                      <div className="text-gray-500 text-xs ml-auto">
+                        {new Date(pair.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div>
+                        <div className="text-gray-500 mb-0.5">진입</div>
+                        <div className="text-white font-semibold">
+                          ${pair.entryOrder.price?.toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-500 mb-0.5">SL</div>
+                        {pair.stopLossOrder ? (
+                          <div className="text-orange-400 font-semibold">
+                            ${pair.stopLossOrder.stopPrice?.toFixed(2)}
+                          </div>
+                        ) : (
+                          <div className="text-gray-600">-</div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-gray-500 mb-0.5">TP</div>
+                        {pair.takeProfitOrder ? (
+                          <div className="text-green-400 font-semibold">
+                            ${pair.takeProfitOrder.takeProfitPrice?.toFixed(2)}
+                          </div>
+                        ) : (
+                          <div className="text-gray-600">-</div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-gray-500 mb-0.5">수량</div>
+                        <div className="text-white font-medium">
+                          {pair.entryOrder.quantity.toFixed(4)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-gray-500 text-sm py-12">
+                주문 내역이 없습니다
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {orderPairs.length > 0 ? (
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {orderPairs.slice(0, 20).map((pair) => {
-            const isLong = pair.entryOrder.side === 'BUY';
-            const chipColor = isLong ? 'bg-green-600' : 'bg-red-600';
-            const chipText = isLong ? 'LONG' : 'SHORT';
-
-            return (
-              <div
-                key={pair.pairId}
-                className="bg-gray-700 rounded p-3 text-sm flex items-center gap-3"
-              >
-                {/* 롱/숏 칩 */}
-                <div className={`${chipColor} px-2 py-1 rounded text-white text-xs font-bold min-w-[50px] text-center`}>
-                  {chipText}
-                </div>
-
-                {/* 주문 정보 */}
-                <div className="flex-1 grid grid-cols-4 gap-2">
-                  <div>
-                    <div className="text-gray-400 text-xs">진입</div>
-                    <div className="text-white font-semibold">
-                      ${pair.entryOrder.price?.toFixed(2)}
-                    </div>
-                  </div>
-
-                  {pair.stopLossOrder ? (
-                    <div>
-                      <div className="text-gray-400 text-xs">스탑로스</div>
-                      <div className="text-orange-400 font-semibold">
-                        ${pair.stopLossOrder.stopPrice?.toFixed(2)}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-gray-400 text-xs">스탑로스</div>
-                      <div className="text-gray-500 text-xs">-</div>
-                    </div>
-                  )}
-
-                  {pair.takeProfitOrder ? (
-                    <div>
-                      <div className="text-gray-400 text-xs">TP</div>
-                      <div className="text-green-400 font-semibold">
-                        ${pair.takeProfitOrder.takeProfitPrice?.toFixed(2)}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-gray-400 text-xs">TP</div>
-                      <div className="text-gray-500 text-xs">-</div>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="text-gray-400 text-xs">수량</div>
-                    <div className="text-white">
-                      {pair.entryOrder.quantity.toFixed(4)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 자동 거래 태그 */}
-                {pair.entryOrder.isAutoTrading && (
-                  <div className="text-xs bg-blue-600 px-2 py-1 rounded text-white">
-                    AUTO
-                  </div>
-                )}
-
-                {/* 시간 */}
-                <div className="text-gray-500 text-xs min-w-[60px] text-right">
-                  {new Date(pair.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="text-center text-gray-500 text-sm py-8">
-          주문 내역이 없습니다
-        </div>
-      )}
+      {/* 스크롤바 스타일 */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #1e222d;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #2a2e39;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #363a45;
+        }
+      `}</style>
     </div>
   );
 };

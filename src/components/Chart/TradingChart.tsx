@@ -116,7 +116,7 @@ export const TradingChart = () => {
               isRestoringRange.current = false;
             }, 100);
           } catch (error) {
-            console.error('Failed to restore chart range:', error);
+            // Silently handle errors
           }
         }
       }
@@ -153,11 +153,7 @@ export const TradingChart = () => {
 
       ctx.clearRect(0, 0, chartWidth, chartHeight);
 
-      console.log('Drawing overlays, count:', drawings.length);
-
       drawings.forEach((drawing, index) => {
-        console.log(`[Drawing ${index}] ID: ${drawing.id}, Type: ${drawing.type}, Color: ${drawing.color}, Points:`, drawing.points);
-
         if (drawing.type === 'trendline' && drawing.points.length >= 2) {
           const p1 = drawing.points[0];
           const p2 = drawing.points[1];
@@ -168,11 +164,7 @@ export const TradingChart = () => {
           const x2 = chart.timeScale().timeToCoordinate(p2.time as any);
           const y2 = series.priceToCoordinate(p2.price);
 
-          console.log(`[Drawing ${index}] Trendline points:`, { p1, p2 });
-          console.log(`[Drawing ${index}] Pixel coordinates:`, { x1, y1, x2, y2 });
-
           if (x1 === null || y1 === null || x2 === null || y2 === null) {
-            console.warn(`[Drawing ${index}] Cannot draw: some coordinates are null`);
             return;
           }
 
@@ -188,8 +180,6 @@ export const TradingChart = () => {
 
             // x = chartWidth일 때의 y 좌표
             const yMax = y1 + slope * (chartWidth - x1);
-
-            console.log('Infinite line:', { slope, y0, yMax, chartWidth });
 
             ctx.strokeStyle = drawing.color;
             ctx.lineWidth = drawing.lineWidth;

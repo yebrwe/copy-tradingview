@@ -183,10 +183,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
     // 돌파 후 재설정인지 확인
     const isAfterBreakout = channelBreakout !== null;
 
-    if (isAfterBreakout) {
-      console.log('🔄 채널 돌파 후 재설정: ATH + 현재 MA200 기반 채널 생성');
-    }
-
     // MA200 계산
     const ma200Period = 200;
     let ma200 = 0;
@@ -207,25 +203,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const currentPrice = candlestickData[candlestickData.length - 1].close;
     const isPriceAboveMA200 = currentPrice > ma200;
 
-    console.log('Peak connection strategy:', {
-      currentPrice,
-      ma200,
-      isPriceAboveMA200,
-      isAfterBreakout,
-      strategy: isAfterBreakout
-        ? 'ATH + 현재 MA200'
-        : (isPriceAboveMA200
-          ? '최고점 + 최고점 왼쪽(과거) 고점 연결'
-          : '기존 알고리즘 (6시간 & 15일 고점)')
-    });
-
     let sortedPeaks: Array<{ time: number; price: number }>;
 
     if (isAfterBreakout) {
       // 돌파 후 재설정: ATH + 현재 MA200 연결
       const allTimeHigh = findAllTimeHigh(candlestickData);
       if (!allTimeHigh) {
-        console.warn('Cannot find all-time high');
         return state;
       }
 
@@ -236,17 +219,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
         { time: currentTime, price: ma200 }
       ];
 
-      console.log('채널 돌파 후 재설정: ATH → 현재 MA200', {
-        ath: sortedPeaks[0],
-        ma200Point: sortedPeaks[1],
-        breakoutType: channelBreakout
-      });
-
     } else if (isPriceAboveMA200) {
       // MA200 위: 최고점 + 최고점 왼쪽(과거)의 고점
       const allTimeHigh = findAllTimeHigh(candlestickData);
       if (!allTimeHigh) {
-        console.warn('Cannot find all-time high');
         return state;
       }
 
@@ -261,7 +237,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
       }
 
       if (athIndex <= 0) {
-        console.warn('All-time high is at the beginning, cannot find older peak');
         return state;
       }
 
@@ -279,20 +254,16 @@ export const useChartStore = create<ChartState>((set, get) => ({
         { time: allTimeHigh.time, price: allTimeHigh.price }
       ];
 
-      console.log('MA200 위 전략: 왼쪽 고점 → 최고점', sortedPeaks);
-
     } else {
       // MA200 아래: 기존 알고리즘 (6시간 & 15일 고점)
       const peaks = findMajorPeaks(candlestickData);
 
       if (peaks.length < 2) {
-        console.warn('Not enough peaks detected');
         return state;
       }
 
       // 시간 순으로 정렬
       sortedPeaks = sortPeaksByTime(peaks);
-      console.log('MA200 아래 전략: 기존 알고리즘', sortedPeaks);
     }
 
     // 추세선 Drawing 생성 (고점 연결)
@@ -307,13 +278,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
       lineWidth: 1,
     };
 
-    console.log('Major peaks connected:', sortedPeaks);
-
     // 역대 저점 찾기
     const allTimeLow = findAllTimeLow(state.candlestickData);
-
-    console.log('All-time low found:', allTimeLow);
-    console.log('Sorted peaks for parallel translation:', sortedPeaks);
 
     const newDrawings: Drawing[] = [trendline];
 
@@ -322,22 +288,14 @@ export const useChartStore = create<ChartState>((set, get) => ({
       const peak1 = sortedPeaks[0];
       const peak2 = sortedPeaks[1];
 
-      console.log('Creating parallel line...');
-      console.log('Peak 1:', peak1);
-      console.log('Peak 2:', peak2);
-      console.log('All-time low:', allTimeLow);
-
       // 고점 추세선의 기울기 계산
       const priceSlope = (peak2.price - peak1.price) / (peak2.time - peak1.time);
-      console.log('Price slope:', priceSlope);
 
       // 최저점 시간에서의 추세선 가격 계산
       const priceAtLowTime = peak1.price + priceSlope * (allTimeLow.time - peak1.time);
-      console.log('Price at low time (if extended):', priceAtLowTime);
 
       // 평행이동 거리 = 실제 최저점 가격 - 추세선의 가격
       const verticalOffset = allTimeLow.price - priceAtLowTime;
-      console.log('Vertical offset for parallel translation:', verticalOffset);
 
       // 추세선의 두 점을 수직으로 평행이동
       const parallelPoint1 = {
@@ -358,16 +316,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
         lineWidth: 1,
       };
 
-      console.log('✓ Parallel line created (translated to all-time low):', parallelLine);
-      console.log('  Point 1:', parallelPoint1);
-      console.log('  Point 2:', parallelPoint2);
-
       newDrawings.push(parallelLine);
-    } else {
-      console.warn('Cannot create parallel line:', {
-        hasAllTimeLow: !!allTimeLow,
-        peaksLength: sortedPeaks.length
-      });
     }
 
     // 기존 자동 생성된 고점 채널 제거 (저점 채널은 유지)
@@ -399,7 +348,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const lows = findMajorLows(state.candlestickData);
 
     if (lows.length < 2) {
-      console.warn('Not enough lows detected');
       return state;
     }
 
@@ -417,8 +365,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
       color: '#ef5350', // 빨간 캔들 색상
       lineWidth: 1,
     };
-
-    console.log('Major lows connected:', sortedLows);
 
     const newDrawings: Drawing[] = [trendline];
 
@@ -457,8 +403,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
         lineWidth: 1,
       };
 
-      console.log('Parallel line created (vertical translation):', parallelLine);
-      console.log('Vertical offset:', verticalOffset);
       newDrawings.push(parallelLine);
     }
 
@@ -526,8 +470,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const shortEntry = calcPriceAtTime(upperLine, currentTime);
     const longEntry = calcPriceAtTime(lowerLine, currentTime);
 
-    console.log('High channel entry points:', { shortEntry, longEntry, currentTime });
-
     set({
       highChannelEntryPoints: {
         shortEntry,
@@ -577,8 +519,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const longEntry = calcPriceAtTime(lowerLine, currentTime);
     const shortEntry = calcPriceAtTime(upperLine, currentTime);
 
-    console.log('Low channel entry points:', { shortEntry, longEntry, currentTime });
-
     set({
       lowChannelEntryPoints: {
         shortEntry,
@@ -595,46 +535,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const highUpper = drawings.find(d => d.id.startsWith('auto-trendline-') && !d.id.includes('low'));
     const lowLower = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
 
-    // 채널이 하나도 없거나 데이터가 부족하면 패턴 없음
-    if ((!highUpper && !lowLower) || candlestickData.length < 200) {
+    // 채널이 하나도 없으면 패턴 없음
+    if (!highUpper && !lowLower) {
       set({ channelPattern: 'none' });
       return;
     }
 
-    // 장기 이동평균선 계산 (200일)
-    const ma200Period = 200;
-    let ma200 = 0;
-
-    if (candlestickData.length >= ma200Period) {
-      let sum = 0;
-      for (let i = candlestickData.length - ma200Period; i < candlestickData.length; i++) {
-        sum += candlestickData[i].close;
-      }
-      ma200 = sum / ma200Period;
+    // 패턴 결정: 고점 채널이 있으면 descending, 저점 채널이 있으면 ascending
+    let pattern: ChannelPattern;
+    if (highUpper && !lowLower) {
+      pattern = 'descending';
+    } else if (lowLower && !highUpper) {
+      pattern = 'ascending';
     } else {
-      // 데이터가 부족하면 전체 평균 사용
-      let sum = 0;
-      for (const candle of candlestickData) {
-        sum += candle.close;
-      }
-      ma200 = sum / candlestickData.length;
+      // 둘 다 있는 경우 기본값은 descending (고점 채널 우선)
+      pattern = 'descending';
     }
-
-    // 현재 가격
-    const currentPrice = candlestickData[candlestickData.length - 1].close;
-
-    // 고점 채널만 사용 (이평선 위/아래 관계없이)
-    // - 이평선 위: ATH + 왼쪽 고점 연결
-    // - 이평선 아래: 기존 알고리즘 (15일 고점)
-    const pattern: ChannelPattern = 'descending';
-
-    console.log('Channel pattern classified (MA200 based):', {
-      pattern,
-      currentPrice,
-      ma200,
-      priceAboveMA: currentPrice > ma200,
-      strategy: currentPrice > ma200 ? 'ATH + 왼쪽 고점' : '기존 알고리즘',
-    });
 
     set({
       channelPattern: pattern
@@ -691,7 +607,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
       }
     }
 
-    console.log('Recommended entries (MA200 based):', recommended);
     set({ recommendedEntries: recommended });
   },
 
@@ -729,28 +644,9 @@ export const useChartStore = create<ChartState>((set, get) => ({
       const touchThreshold = ma200 * 0.005;
       const priceDiff = Math.abs(currentPrice - ma200);
 
-      console.log('MA200 터치 확인:', {
-        currentPrice,
-        ma200,
-        diff: priceDiff,
-        diffPercent: ((priceDiff / ma200) * 100).toFixed(2) + '%',
-        threshold: touchThreshold,
-        thresholdPercent: '0.5%',
-        willReset: priceDiff <= touchThreshold,
-      });
-
       // MA200 터치 감지
       if (priceDiff <= touchThreshold) {
-        console.log('✅ MA200 터치 감지! 돌파 상태 해제:', {
-          currentPrice,
-          ma200,
-          diff: priceDiff,
-          threshold: touchThreshold,
-          previousBreakout: channelBreakout,
-        });
-
         set({ channelBreakout: null });
-        console.log('💡 이제 "고점 연결" 버튼으로 일반 채널을 생성할 수 있습니다.');
         return;
       }
 
@@ -764,25 +660,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
         if (channelBreakout === 'upper' && currentPrice < upperPrice) {
           isBackInside = true;
-          console.log('✅ 채널 상단 복귀 감지:', {
-            currentPrice,
-            upperPrice,
-            diff: upperPrice - currentPrice,
-            diffPercent: ((upperPrice - currentPrice) / upperPrice * 100).toFixed(2) + '%',
-          });
         } else if (channelBreakout === 'lower' && currentPrice > lowerPrice) {
           isBackInside = true;
-          console.log('✅ 채널 하단 복귀 감지:', {
-            currentPrice,
-            lowerPrice,
-            diff: currentPrice - lowerPrice,
-            diffPercent: ((currentPrice - lowerPrice) / lowerPrice * 100).toFixed(2) + '%',
-          });
         }
 
         if (isBackInside) {
           set({ channelBreakout: null });
-          console.log('💡 채널 복귀로 돌파 상태 해제 - 자동 거래 재개 가능');
         }
       }
 
@@ -810,30 +693,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const upperBreakoutLine = upperPrice + upperThreshold;
     if (currentPrice > upperBreakoutLine) {
       breakoutStatus = 'upper';
-      console.log('⚠️ 채널 상단 돌파 감지:', {
-        currentPrice,
-        upperPrice,
-        breakoutLine: upperBreakoutLine,
-        threshold: upperThreshold,
-        thresholdPercent: (BREAKOUT_THRESHOLD_PERCENT * 100).toFixed(1) + '%',
-        diff: currentPrice - upperPrice,
-        diffPercent: ((currentPrice - upperPrice) / upperPrice * 100).toFixed(2) + '%',
-      });
     }
     // 하단 채널 돌파 확인 (하단선 - 하단선의 5% 이하)
     else {
       const lowerBreakoutLine = lowerPrice - lowerThreshold;
       if (currentPrice < lowerBreakoutLine) {
         breakoutStatus = 'lower';
-        console.log('⚠️ 채널 하단 돌파 감지:', {
-          currentPrice,
-          lowerPrice,
-          breakoutLine: lowerBreakoutLine,
-          threshold: lowerThreshold,
-          thresholdPercent: (BREAKOUT_THRESHOLD_PERCENT * 100).toFixed(1) + '%',
-          diff: lowerPrice - currentPrice,
-          diffPercent: ((lowerPrice - currentPrice) / lowerPrice * 100).toFixed(2) + '%',
-        });
       }
     }
 
@@ -841,13 +706,10 @@ export const useChartStore = create<ChartState>((set, get) => ({
     if (breakoutStatus !== state.channelBreakout) {
       set({ channelBreakout: breakoutStatus });
       if (breakoutStatus) {
-        console.log('🔴 채널 돌파 감지 → ATH + MA200 빗각 자동 생성');
         // 돌파 감지 시 자동으로 ATH → 현재 MA200 기반 빗각 생성
         setTimeout(() => {
           get().connectMajorPeaks();
         }, 0);
-      } else {
-        console.log('✅ 채널 내부로 복귀');
       }
     }
   },
@@ -855,8 +717,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
   // 백테스팅 액션
   startBacktesting: () => {
     const state = get();
-
-    console.log('백테스팅 모드 시작');
 
     // 현재 데이터를 스냅샷으로 저장
     set({
@@ -869,8 +729,6 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   stopBacktesting: () => {
     const state = get();
-
-    console.log('백테스팅 모드 종료');
 
     // 전체 데이터로 복원
     set({
@@ -890,15 +748,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const state = get();
 
     if (!state.isBacktesting) {
-      console.warn('백테스팅 모드가 아닙니다.');
       return;
     }
 
     // 인덱스 범위 체크
     const maxIndex = state.fullCandlestickData.length - 1;
     const clampedIndex = Math.max(50, Math.min(index, maxIndex)); // 최소 50개 캔들은 보여줌
-
-    console.log(`백테스팅 시점 이동: ${clampedIndex + 1} / ${state.fullCandlestickData.length}`);
 
     // 해당 인덱스까지의 데이터만 표시
     const slicedData = state.fullCandlestickData.slice(0, clampedIndex + 1);
@@ -922,11 +777,8 @@ export const useChartStore = create<ChartState>((set, get) => ({
   },
 
   recalculateChannels: () => {
-    console.log('채널 재계산 중...');
-
     const state = get();
     if (state.candlestickData.length < 50) {
-      console.warn('데이터가 부족합니다.');
       return;
     }
 
@@ -962,16 +814,9 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
       const currentPrice = candlestickData[candlestickData.length - 1].close;
 
-      console.log('백테스팅 MA200 기반 패턴 판단:', {
-        currentPrice,
-        ma200,
-        pattern: currentPrice > ma200 ? 'ascending' : 'descending'
-      });
-
       // 이평선 위/아래 관계없이 항상 고점 채널 생성
       // - 이평선 위: ATH + 왼쪽 고점 연결 → 최저점 평행이동
       // - 이평선 아래: 기존 알고리즘 (15일 고점 연결)
-      console.log('백테스팅: 고점 채널 생성 (이평선:', currentPrice > ma200 ? '위' : '아래', ')');
       get().connectMajorPeaks();
     }, 100);
   },
