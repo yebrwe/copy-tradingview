@@ -32,6 +32,7 @@ interface UserDataStreamHook {
   orders: Order[];
   isConnected: boolean;
   error: string | null;
+  removedOrderIds: Set<number>; // 체결/취소된 주문 ID 추적
 }
 
 interface UserDataStreamOptions {
@@ -54,6 +55,7 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
   const [orders, setOrders] = useState<Order[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removedOrderIds, setRemovedOrderIds] = useState<Set<number>>(new Set());
 
   const wsRef = useRef<WebSocket | null>(null);
   const listenKeyRef = useRef<string | null>(null);
@@ -180,6 +182,14 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
               // 완전 체결, 취소, 만료 - 목록에서 제거
               setOrders(prev => prev.filter(o => o.orderId !== updatedOrder.orderId));
 
+              // 제거된 주문 ID 추적 (REST API 데이터 필터링용)
+              setRemovedOrderIds(prev => {
+                const newSet = new Set(prev);
+                newSet.add(updatedOrder.orderId);
+                console.log(`주문 ${orderUpdate.X} - orderId ${updatedOrder.orderId} 제거 목록에 추가`);
+                return newSet;
+              });
+
               // 주문 상태 변경 시 잔고 갱신
               if (onBalanceUpdate) {
                 console.log(`주문 ${orderUpdate.X} 감지 - 잔고 갱신`);
@@ -257,6 +267,7 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
     setIsConnected(false);
     setPositions([]);
     setOrders([]);
+    setRemovedOrderIds(new Set()); // 제거 목록 초기화
   };
 
   // enabled 상태에 따라 연결/해제
@@ -277,5 +288,6 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
     orders,
     isConnected,
     error,
+    removedOrderIds,
   };
 };

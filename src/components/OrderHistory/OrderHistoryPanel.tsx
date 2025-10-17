@@ -29,7 +29,7 @@ export const OrderHistoryPanel = () => {
   };
 
   // WebSocket으로 실시간 포지션 및 미체결 주문 수신
-  const { positions, orders: openOrders, isConnected } = useUserDataStream({
+  const { positions, orders: openOrders, isConnected, removedOrderIds } = useUserDataStream({
     enabled: true,
     onBalanceUpdate: handleBalanceUpdate,
   });
@@ -47,17 +47,39 @@ export const OrderHistoryPanel = () => {
       }
 
       try {
+        console.log('REST API로 미체결 주문 조회 중...');
         const orders = await BinanceFuturesAPI.getOpenOrders(symbol);
+        console.log('REST API 조회 결과:', orders.length, '건', orders);
         setInitialOrders(orders);
         setHasFetchedInitialOrders(true);
       } catch (err: any) {
-        // Silently handle errors
+        console.error('미체결 주문 조회 실패:', err);
       }
     };
 
     // 컴포넌트 마운트 시 또는 심볼 변경 시 조회
     fetchInitialOrders();
   }, [symbol, hasFetchedInitialOrders]);
+
+  // WebSocket 연결 후 REST API 재조회 (최신 데이터로 동기화)
+  useEffect(() => {
+    if (isConnected && hasFetchedInitialOrders) {
+      const refreshOrders = async () => {
+        try {
+          console.log('WebSocket 연결 후 REST API 재조회...');
+          const orders = await BinanceFuturesAPI.getOpenOrders(symbol);
+          console.log('REST API 재조회 결과:', orders.length, '건', orders);
+          setInitialOrders(orders);
+        } catch (err: any) {
+          console.error('REST API 재조회 실패:', err);
+        }
+      };
+
+      // WebSocket 연결 후 2초 뒤 재조회 (WebSocket이 초기 데이터를 받을 시간을 줌)
+      const timer = setTimeout(refreshOrders, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, symbol, hasFetchedInitialOrders]);
 
   // 심볼이 변경되면 초기 조회 플래그 리셋
   useEffect(() => {
@@ -117,8 +139,11 @@ export const OrderHistoryPanel = () => {
   const uniqueOrdersMap = new Map<number, any>();
 
   // 1. 먼저 initialOrders 추가 (REST API로 조회한 전체 미체결 주문)
+  // 단, WebSocket에서 제거된 주문은 제외
   initialOrders.forEach(order => {
-    uniqueOrdersMap.set(order.orderId, order);
+    if (!removedOrderIds.has(order.orderId)) {
+      uniqueOrdersMap.set(order.orderId, order);
+    }
   });
 
   // 2. WebSocket 데이터로 덮어쓰기 (더 최신 데이터)
@@ -138,6 +163,7 @@ export const OrderHistoryPanel = () => {
   console.log('미체결 주문 병합:', {
     initialOrders: initialOrders.length,
     openOrders: openOrders.length,
+    removedOrderIds: removedOrderIds.size,
     merged: mergedOrders.length,
     currentSymbol: currentSymbolOrders.length,
   });
