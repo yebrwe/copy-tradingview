@@ -645,7 +645,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
   checkChannelBreakout: () => {
     const state = get();
-    const { candlestickData, highChannelEntryPoints, channelBreakout } = state;
+    const { candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelBreakout } = state;
 
     if (candlestickData.length === 0) {
       return;
@@ -684,20 +684,30 @@ export const useChartStore = create<ChartState>((set, get) => ({
       }
 
       // 채널 복귀 감지 (잠깐 벗어났다가 다시 들어온 경우)
-      if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
-        const upperPrice = highChannelEntryPoints.shortEntry;
-        const lowerPrice = highChannelEntryPoints.longEntry;
+      // 패턴에 따라 확인할 채널 선택
+      let channelUpper: number | null = null;
+      let channelLower: number | null = null;
 
+      if (state.channelPattern === 'ascending') {
+        channelUpper = lowChannelEntryPoints.shortEntry;
+        channelLower = lowChannelEntryPoints.longEntry;
+      } else if (state.channelPattern === 'descending') {
+        channelUpper = highChannelEntryPoints.shortEntry;
+        channelLower = highChannelEntryPoints.longEntry;
+      }
+
+      if (channelUpper !== null && channelLower !== null) {
         // 돌파했던 방향으로 다시 채널 안으로 들어왔는지 확인
         let isBackInside = false;
 
-        if (channelBreakout === 'upper' && currentPrice < upperPrice) {
+        if (channelBreakout === 'upper' && currentPrice < channelUpper) {
           isBackInside = true;
-        } else if (channelBreakout === 'lower' && currentPrice > lowerPrice) {
+        } else if (channelBreakout === 'lower' && currentPrice > channelLower) {
           isBackInside = true;
         }
 
         if (isBackInside) {
+          console.log('✅ 채널 복귀 감지');
           set({ channelBreakout: null });
         }
       }
@@ -706,14 +716,30 @@ export const useChartStore = create<ChartState>((set, get) => ({
       return;
     }
 
-    // 고점 채널만 사용하므로 highChannelEntryPoints만 확인
-    if (highChannelEntryPoints.shortEntry === null || highChannelEntryPoints.longEntry === null) {
+    // 채널 패턴에 따라 확인할 진입점 선택
+    let upperPrice: number | null = null;
+    let lowerPrice: number | null = null;
+
+    if (state.channelPattern === 'ascending') {
+      // 상승 추세 - 저점 채널 사용
+      if (lowChannelEntryPoints.shortEntry === null || lowChannelEntryPoints.longEntry === null) {
+        return;
+      }
+      upperPrice = lowChannelEntryPoints.shortEntry;
+      lowerPrice = lowChannelEntryPoints.longEntry;
+    } else if (state.channelPattern === 'descending') {
+      // 하락 추세 - 고점 채널 사용
+      if (highChannelEntryPoints.shortEntry === null || highChannelEntryPoints.longEntry === null) {
+        return;
+      }
+      upperPrice = highChannelEntryPoints.shortEntry;
+      lowerPrice = highChannelEntryPoints.longEntry;
+    } else {
+      // 패턴이 없으면 돌파 체크 안함
       return;
     }
 
     const currentPrice = candlestickData[candlestickData.length - 1].close;
-    const upperPrice = highChannelEntryPoints.shortEntry;
-    const lowerPrice = highChannelEntryPoints.longEntry;
 
     // 빗각 기준 돌파 임계값 (각 라인 가격의 5% - 스탑로스 비율 기준)
     const BREAKOUT_THRESHOLD_PERCENT = 0.05; // 5% (기본 스탑로스 비율)
@@ -722,17 +748,23 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
     let breakoutStatus: 'upper' | 'lower' | null = null;
 
-    // 상단 채널 돌파 확인 (상단선 + 상단선의 5% 이상)
-    const upperBreakoutLine = upperPrice + upperThreshold;
-    if (currentPrice > upperBreakoutLine) {
-      breakoutStatus = 'upper';
-    }
-    // 하단 채널 돌파 확인 (하단선 - 하단선의 5% 이하)
-    else {
+    // 채널 패턴에 따라 손해 발생 돌파만 감지
+    if (state.channelPattern === 'ascending') {
+      // 상승 추세 (롱 진입 대기) - 하락 돌파만 손해
       const lowerBreakoutLine = lowerPrice - lowerThreshold;
       if (currentPrice < lowerBreakoutLine) {
-        breakoutStatus = 'lower';
+        breakoutStatus = 'lower';  // 하락 돌파 = 손해
+        console.log('🔴 상승 추세에서 하락 돌파 감지 (손해 발생)');
       }
+      // 상승 돌파는 원래 목표이므로 무시
+    } else if (state.channelPattern === 'descending') {
+      // 하락 추세 (숏 진입 대기) - 상승 돌파만 손해
+      const upperBreakoutLine = upperPrice + upperThreshold;
+      if (currentPrice > upperBreakoutLine) {
+        breakoutStatus = 'upper';  // 상승 돌파 = 손해
+        console.log('🔴 하락 추세에서 상승 돌파 감지 (손해 발생)');
+      }
+      // 하락 돌파는 원래 목표이므로 무시
     }
 
     // 돌파 상태가 변경된 경우에만 업데이트
