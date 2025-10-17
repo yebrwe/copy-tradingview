@@ -29,7 +29,7 @@ export const OrderHistoryPanel = () => {
   };
 
   // WebSocket으로 실시간 포지션 및 미체결 주문 수신
-  const { positions, orders: openOrders, isConnected, removedOrderIds } = useUserDataStream({
+  const { positions, orders: openOrders, isConnected, removedOrderIds, clearRemovedOrderIds } = useUserDataStream({
     enabled: true,
     onBalanceUpdate: handleBalanceUpdate,
   });
@@ -67,6 +67,8 @@ export const OrderHistoryPanel = () => {
       const refreshOrders = async () => {
         try {
           console.log('WebSocket 연결 후 REST API 재조회...');
+          // REST API 재조회 전에 removedOrderIds 초기화
+          clearRemovedOrderIds();
           const orders = await BinanceFuturesAPI.getOpenOrders(symbol);
           console.log('REST API 재조회 결과:', orders.length, '건', orders);
           setInitialOrders(orders);
@@ -79,7 +81,7 @@ export const OrderHistoryPanel = () => {
       const timer = setTimeout(refreshOrders, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isConnected, symbol, hasFetchedInitialOrders]);
+  }, [isConnected, symbol, hasFetchedInitialOrders, clearRemovedOrderIds]);
 
   // 심볼이 변경되면 초기 조회 플래그 리셋
   useEffect(() => {

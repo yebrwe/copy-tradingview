@@ -33,6 +33,7 @@ interface UserDataStreamHook {
   isConnected: boolean;
   error: string | null;
   removedOrderIds: Set<number>; // 체결/취소된 주문 ID 추적
+  clearRemovedOrderIds: () => void; // 제거된 주문 ID 목록 초기화
 }
 
 interface UserDataStreamOptions {
@@ -232,6 +233,12 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
     }
   };
 
+  // 제거된 주문 ID 목록 초기화
+  const clearRemovedOrderIds = () => {
+    console.log('removedOrderIds 초기화 (REST API 재조회 시)');
+    setRemovedOrderIds(new Set());
+  };
+
   // WebSocket 연결 해제
   const disconnect = async () => {
     console.log('User Data Stream 연결 해제...');
@@ -289,5 +296,6 @@ export const useUserDataStream = (options: UserDataStreamOptions | boolean): Use
     isConnected,
     error,
     removedOrderIds,
+    clearRemovedOrderIds,
   };
 };
