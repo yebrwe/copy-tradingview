@@ -112,23 +112,35 @@ export const OrderHistoryPanel = () => {
   // 현재 심볼의 포지션만 필터링
   const currentSymbolPositions = positions.filter(p => p.symbol === symbol);
 
-  // WebSocket 주문과 초기 조회 주문 병합
-  // WebSocket 데이터가 있으면 우선 사용하고, 없으면 초기 조회 데이터 사용
-  let mergedOrders: any[];
+  // WebSocket 주문과 초기 조회 주문 병합 (orderId 기준 중복 제거)
+  // WebSocket 데이터를 우선시하되, WebSocket에 없는 주문은 initialOrders에서 추가
+  const uniqueOrdersMap = new Map<number, any>();
 
-  if (openOrders.length > 0) {
-    // WebSocket으로 주문 업데이트를 받았으면, WebSocket 데이터만 사용
-    // (체결/취소된 주문은 이미 openOrders에서 제거되었음)
-    mergedOrders = openOrders;
-  } else if (isConnected && initialOrders.length === 0) {
-    // WebSocket 연결되었고 initialOrders도 없으면 미체결 주문이 없는 것
-    mergedOrders = [];
-  } else {
-    // WebSocket 연결 전이거나 아직 업데이트를 받지 못한 경우: 초기 조회 데이터 사용
-    mergedOrders = initialOrders;
-  }
+  // 1. 먼저 initialOrders 추가 (REST API로 조회한 전체 미체결 주문)
+  initialOrders.forEach(order => {
+    uniqueOrdersMap.set(order.orderId, order);
+  });
+
+  // 2. WebSocket 데이터로 덮어쓰기 (더 최신 데이터)
+  // WebSocket에서 받은 주문은 상태가 업데이트된 것이므로 우선순위가 높음
+  openOrders.forEach(order => {
+    uniqueOrdersMap.set(order.orderId, order);
+  });
+
+  // 3. 체결/취소된 주문은 제외 (status가 FILLED, CANCELED, EXPIRED인 경우)
+  const mergedOrders = Array.from(uniqueOrdersMap.values()).filter(order => {
+    // NEW나 PARTIALLY_FILLED 상태만 표시
+    return order.status === 'NEW' || order.status === 'PARTIALLY_FILLED';
+  });
 
   const currentSymbolOrders = mergedOrders.filter(o => o.symbol === symbol);
+
+  console.log('미체결 주문 병합:', {
+    initialOrders: initialOrders.length,
+    openOrders: openOrders.length,
+    merged: mergedOrders.length,
+    currentSymbol: currentSymbolOrders.length,
+  });
 
   return (
     <div className="bg-[#1e222d] rounded-lg overflow-hidden border border-[#2a2e39]">
