@@ -535,21 +535,54 @@ export const useChartStore = create<ChartState>((set, get) => ({
     const highUpper = drawings.find(d => d.id.startsWith('auto-trendline-') && !d.id.includes('low'));
     const lowLower = drawings.find(d => d.id.startsWith('auto-trendline-low-'));
 
-    // 채널이 하나도 없으면 패턴 없음
-    if (!highUpper && !lowLower) {
+    // 채널이 하나도 없거나 데이터가 부족하면 패턴 없음
+    if ((!highUpper && !lowLower) || candlestickData.length === 0) {
       set({ channelPattern: 'none' });
       return;
     }
 
-    // 패턴 결정: 고점 채널이 있으면 descending, 저점 채널이 있으면 ascending
-    let pattern: ChannelPattern;
-    if (highUpper && !lowLower) {
-      pattern = 'descending';
-    } else if (lowLower && !highUpper) {
-      pattern = 'ascending';
+    // 장기 이동평균선 계산 (200일)
+    const ma200Period = 200;
+    let ma200 = 0;
+
+    if (candlestickData.length >= ma200Period) {
+      let sum = 0;
+      for (let i = candlestickData.length - ma200Period; i < candlestickData.length; i++) {
+        sum += candlestickData[i].close;
+      }
+      ma200 = sum / ma200Period;
     } else {
-      // 둘 다 있는 경우 기본값은 descending (고점 채널 우선)
+      // 데이터가 부족하면 전체 평균 사용
+      let sum = 0;
+      for (const candle of candlestickData) {
+        sum += candle.close;
+      }
+      ma200 = sum / candlestickData.length;
+    }
+
+    // 현재 가격
+    const currentPrice = candlestickData[candlestickData.length - 1].close;
+
+    // 패턴 판단 로직
+    let pattern: ChannelPattern = 'none';
+
+    // 1. 둘 다 있으면 이평선 기준으로 판단
+    if (highUpper && lowLower) {
+      if (currentPrice > ma200) {
+        // 현재 가격이 이평선 위 → 상승 추세 → 저점 채널 사용
+        pattern = 'ascending';
+      } else {
+        // 현재 가격이 이평선 아래 → 하락 추세 → 고점 채널 사용
+        pattern = 'descending';
+      }
+    }
+    // 2. 고점 채널만 있으면 하락 추세로 간주
+    else if (highUpper && !lowLower) {
       pattern = 'descending';
+    }
+    // 3. 저점 채널만 있으면 상승 추세로 간주
+    else if (lowLower && !highUpper) {
+      pattern = 'ascending';
     }
 
     set({
