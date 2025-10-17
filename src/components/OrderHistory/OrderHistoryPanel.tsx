@@ -112,21 +112,22 @@ export const OrderHistoryPanel = () => {
   // 현재 심볼의 포지션만 필터링
   const currentSymbolPositions = positions.filter(p => p.symbol === symbol);
 
-  // WebSocket 주문과 초기 조회 주문 병합 (orderId 기준 중복 제거)
-  // WebSocket 데이터가 더 최신이므로 우선순위 부여
-  const uniqueOrdersMap = new Map();
+  // WebSocket 주문과 초기 조회 주문 병합
+  // WebSocket 데이터가 있으면 우선 사용하고, 없으면 초기 조회 데이터 사용
+  let mergedOrders: any[];
 
-  // 먼저 초기 조회 주문을 추가
-  initialOrders.forEach(order => {
-    uniqueOrdersMap.set(order.orderId, order);
-  });
+  if (openOrders.length > 0) {
+    // WebSocket으로 주문 업데이트를 받았으면, WebSocket 데이터만 사용
+    // (체결/취소된 주문은 이미 openOrders에서 제거되었음)
+    mergedOrders = openOrders;
+  } else if (isConnected && initialOrders.length === 0) {
+    // WebSocket 연결되었고 initialOrders도 없으면 미체결 주문이 없는 것
+    mergedOrders = [];
+  } else {
+    // WebSocket 연결 전이거나 아직 업데이트를 받지 못한 경우: 초기 조회 데이터 사용
+    mergedOrders = initialOrders;
+  }
 
-  // WebSocket 주문으로 덮어쓰기 (더 최신 데이터)
-  openOrders.forEach(order => {
-    uniqueOrdersMap.set(order.orderId, order);
-  });
-
-  const mergedOrders = Array.from(uniqueOrdersMap.values());
   const currentSymbolOrders = mergedOrders.filter(o => o.symbol === symbol);
 
   return (
