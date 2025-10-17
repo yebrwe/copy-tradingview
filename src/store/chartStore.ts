@@ -751,6 +751,39 @@ export const useChartStore = create<ChartState>((set, get) => ({
 
         set({ channelBreakout: null });
         console.log('💡 이제 "고점 연결" 버튼으로 일반 채널을 생성할 수 있습니다.');
+        return;
+      }
+
+      // 채널 복귀 감지 (잠깐 벗어났다가 다시 들어온 경우)
+      if (highChannelEntryPoints.shortEntry !== null && highChannelEntryPoints.longEntry !== null) {
+        const upperPrice = highChannelEntryPoints.shortEntry;
+        const lowerPrice = highChannelEntryPoints.longEntry;
+
+        // 돌파했던 방향으로 다시 채널 안으로 들어왔는지 확인
+        let isBackInside = false;
+
+        if (channelBreakout === 'upper' && currentPrice < upperPrice) {
+          isBackInside = true;
+          console.log('✅ 채널 상단 복귀 감지:', {
+            currentPrice,
+            upperPrice,
+            diff: upperPrice - currentPrice,
+            diffPercent: ((upperPrice - currentPrice) / upperPrice * 100).toFixed(2) + '%',
+          });
+        } else if (channelBreakout === 'lower' && currentPrice > lowerPrice) {
+          isBackInside = true;
+          console.log('✅ 채널 하단 복귀 감지:', {
+            currentPrice,
+            lowerPrice,
+            diff: currentPrice - lowerPrice,
+            diffPercent: ((currentPrice - lowerPrice) / lowerPrice * 100).toFixed(2) + '%',
+          });
+        }
+
+        if (isBackInside) {
+          set({ channelBreakout: null });
+          console.log('💡 채널 복귀로 돌파 상태 해제 - 자동 거래 재개 가능');
+        }
       }
 
       // 돌파 상태일 때는 MA200 터치 확인만 하고 종료 (채널 내/외 재확인 안함)
@@ -808,7 +841,11 @@ export const useChartStore = create<ChartState>((set, get) => ({
     if (breakoutStatus !== state.channelBreakout) {
       set({ channelBreakout: breakoutStatus });
       if (breakoutStatus) {
-        console.log('🚫 채널 돌파로 인해 자동 거래 중지 (채널 재설정 필요)');
+        console.log('🔴 채널 돌파 감지 → ATH + MA200 빗각 자동 생성');
+        // 돌파 감지 시 자동으로 ATH → 현재 MA200 기반 빗각 생성
+        setTimeout(() => {
+          get().connectMajorPeaks();
+        }, 0);
       } else {
         console.log('✅ 채널 내부로 복귀');
       }

@@ -37,10 +37,11 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const useAutoTrading = (config: AutoTradingConfig) => {
   const { symbol, candlestickData, highChannelEntryPoints, lowChannelEntryPoints, channelPattern, recommendedEntries, channelBreakout, checkChannelBreakout } = useChartStore();
   const { showError, showSuccess } = useToastStore();
-  const { addOrder } = useOrderHistoryStore();
+  const { addOrder, loadFromStorage } = useOrderHistoryStore();
   const lastCandleTimeRef = useRef<number | null>(null);
   const isInitializedRef = useRef(false);
   const scheduledTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasCheckedInitialOrdersRef = useRef(false);
 
   // 비율 기반 수량 계산
   const calculateQuantityFromPercentage = (currentPrice: number, balance?: number): number => {
@@ -306,10 +307,42 @@ export const useAutoTrading = (config: AutoTradingConfig) => {
       lastCandleTimeRef.current = currentTime;
       isInitializedRef.current = true;
 
+      // localStorage에서 주문 내역 로드
+      loadFromStorage();
+
       // 초기 자동 거래 실행 (설정이 활성화되어 있으면)
-      if (config.enabled) {
+      if (config.enabled && !hasCheckedInitialOrdersRef.current) {
+        hasCheckedInitialOrdersRef.current = true;
+
         setTimeout(() => {
-          executeAutoTrading();
+          // 최신 orders 상태를 가져오기 위해 store에서 직접 조회
+          const currentOrders = useOrderHistoryStore.getState().orders;
+
+          // 현재 캔들 시간대에 주문이 있는지 확인 (1시간봉 기준)
+          const candleStartTime = currentTime * 1000; // 초 → 밀리초
+          const candleEndTime = candleStartTime + 60 * 60 * 1000; // 1시간 후
+
+          // 현재 캔들 시간대의 자동 거래 주문 확인
+          const ordersInCurrentCandle = currentOrders.filter(order =>
+            order.isAutoTrading &&
+            order.timestamp >= candleStartTime &&
+            order.timestamp < candleEndTime &&
+            order.type === 'LIMIT' // 진입 주문만 확인
+          );
+
+          if (ordersInCurrentCandle.length === 0) {
+            console.log('📋 현재 캔들 시간대에 주문 없음 - 자동 거래 실행');
+            console.log('현재 캔들 시간:', new Date(candleStartTime).toLocaleString());
+            console.log('캔들 범위:', new Date(candleStartTime).toLocaleString(), '~', new Date(candleEndTime).toLocaleString());
+            console.log('전체 주문 수:', currentOrders.length);
+            executeAutoTrading();
+          } else {
+            console.log('✅ 현재 캔들 시간대에 이미 주문 존재 - 자동 거래 스킵');
+            console.log('현재 캔들 시간:', new Date(candleStartTime).toLocaleString());
+            console.log('캔들 범위:', new Date(candleStartTime).toLocaleString(), '~', new Date(candleEndTime).toLocaleString());
+            console.log('기존 주문 수:', ordersInCurrentCandle.length);
+            console.log('기존 주문:', ordersInCurrentCandle);
+          }
         }, 2000); // 2초 후 실행 (데이터 로드 후)
       }
 
